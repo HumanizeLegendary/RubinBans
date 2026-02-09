@@ -62,7 +62,6 @@ public final class PluginBansVelocity {
         this.punishmentService = new VelocityPunishmentService(repository, config.nnrHiddenReason());
         this.messages = config.messages();
         proxy.getChannelRegistrar().register(CHANNEL);
-        proxy.getEventManager().register(this, this);
     }
 
     @Subscribe(order = PostOrder.FIRST)
