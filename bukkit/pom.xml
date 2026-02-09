@@ -5,59 +5,44 @@
     <modelVersion>4.0.0</modelVersion>
     
     <parent>
-        <groupId>me.leoko.advancedban</groupId>
-        <artifactId>AdvancedBan</artifactId>
-        <version>2.3.0</version>
+        <groupId>com.pluginbans</groupId>
+        <artifactId>PluginBans</artifactId>
+        <version>1.0.0</version>
     </parent>
 
-    <artifactId>AdvancedBan-Bukkit</artifactId>
+    <artifactId>PluginBans-Paper</artifactId>
     <packaging>jar</packaging>
 
     <repositories>
-    	<!-- Spigot API -->
         <repository>
-            <id>spigot-repo</id>
-            <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
-        </repository>
-        <!-- bStats -->
-        <repository>
-            <id>CodeMC</id>
-            <url>https://repo.codemc.org/repository/maven-public</url>
-        </repository>
-        <!-- Vault -->
-        <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
+            <id>papermc-repo</id>
+            <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
     </repositories>
 
     <dependencies>
         <dependency>
-            <groupId>org.spigotmc</groupId>
-            <artifactId>spigot-api</artifactId>
-            <version>1.12-R0.1-SNAPSHOT</version>
+            <groupId>io.papermc.paper</groupId>
+            <artifactId>paper-api</artifactId>
+            <version>1.21.1-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
-            <groupId>org.bstats</groupId>
-            <artifactId>bstats-bukkit</artifactId>
-            <version>1.5</version>
-            <scope>compile</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.github.MilkBowl</groupId>
-            <artifactId>VaultAPI</artifactId>
-            <version>1.7</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>me.leoko.advancedban</groupId>
-            <artifactId>AdvancedBan-Core</artifactId>
+            <groupId>com.pluginbans</groupId>
+            <artifactId>PluginBans-Core</artifactId>
             <version>${project.version}</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <sourceDirectory>src/plugin/java</sourceDirectory>
+        <resources>
+            <resource>
+                <directory>src/plugin/resources</directory>
+                <filtering>false</filtering>
+            </resource>
+        </resources>
+    </build>
 </project>

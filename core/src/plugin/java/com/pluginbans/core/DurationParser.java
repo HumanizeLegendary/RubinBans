@@ -1,0 +1,38 @@
+package com.pluginbans.core;
+
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public final class DurationParser {
+    private static final Pattern TOKEN = Pattern.compile("(\\d+)([smhd])");
+
+    private DurationParser() {
+    }
+
+    public static long parseToSeconds(String input) {
+        String normalized = input.trim().toLowerCase(Locale.ROOT);
+        if (normalized.equals("perm") || normalized.equals("permanent") || normalized.equals("навсегда")) {
+            return 0L;
+        }
+        Matcher matcher = TOKEN.matcher(normalized);
+        long total = 0L;
+        int matches = 0;
+        while (matcher.find()) {
+            matches++;
+            long value = Long.parseLong(matcher.group(1));
+            switch (matcher.group(2)) {
+                case "s" -> total += value;
+                case "m" -> total += value * 60L;
+                case "h" -> total += value * 3600L;
+                case "d" -> total += value * 86400L;
+                default -> {
+                }
+            }
+        }
+        if (matches == 0 || total < 0 || !normalized.replaceAll("\\d+[smhd]", "").isEmpty()) {
+            throw new IllegalArgumentException("Неверный формат длительности.");
+        }
+        return total;
+    }
+}

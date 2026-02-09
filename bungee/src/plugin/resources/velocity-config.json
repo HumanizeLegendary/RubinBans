@@ -1,0 +1,17 @@
+{
+  "database": {
+    "type": "SQLITE",
+    "host": "localhost",
+    "port": 3306,
+    "database": "pluginbans",
+    "user": "root",
+    "password": "",
+    "poolSize": 10
+  },
+  "messages": {
+    "prefix": "<gray>[<aqua>PluginBans</aqua>]</gray> ",
+    "banScreen": "<gray>---------------------</gray>\n<red>Вы были наказаны.</red>\n\n<gray>Причина:</gray> <white>%reason%</white>\n<gray>Длительность:</gray> <white>%time%</white>\n\n<gray>ID:</gray> <white>%id%</white>\n<gray>---------------------</gray>",
+    "joinDenied": "<red>Доступ запрещен.</red>"
+  },
+  "nnrHiddenReason": "Служебное наказание"
+}
