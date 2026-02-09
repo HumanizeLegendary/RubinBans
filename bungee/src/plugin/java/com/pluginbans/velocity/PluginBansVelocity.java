@@ -12,6 +12,7 @@ import com.velocitypowered.api.event.connection.PreLoginEvent;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.Plugin;
+import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import com.google.inject.Inject;
@@ -30,6 +31,7 @@ import java.util.UUID;
 public final class PluginBansVelocity {
     private static final MinecraftChannelIdentifier CHANNEL = MinecraftChannelIdentifier.from("pluginbans:sync");
     private final ProxyServer proxy;
+    private final Path dataDirectory;
     private DatabaseManager databaseManager;
     private PunishmentRepository repository;
     private VelocityPunishmentService punishmentService;
@@ -37,13 +39,14 @@ public final class PluginBansVelocity {
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
 
     @Inject
-    public PluginBansVelocity(ProxyServer proxy) {
+    public PluginBansVelocity(ProxyServer proxy, @DataDirectory Path dataDirectory) {
         this.proxy = proxy;
+        this.dataDirectory = dataDirectory;
     }
 
     @Subscribe
     public void onProxyInitialization(com.velocitypowered.api.event.proxy.ProxyInitializeEvent event) {
-        VelocityConfig config = loadConfig(proxy.getDataDirectory());
+        VelocityConfig config = loadConfig(dataDirectory);
         DatabaseConfig databaseConfig = new DatabaseConfig(
                 DatabaseType.valueOf(config.database().type()),
                 config.database().host(),
@@ -51,7 +54,7 @@ public final class PluginBansVelocity {
                 config.database().database(),
                 config.database().user(),
                 config.database().password(),
-                proxy.getDataDirectory().resolve("pluginbans-velocity.db").toString(),
+                dataDirectory.resolve("pluginbans-velocity.db").toString(),
                 config.database().poolSize()
         );
         this.databaseManager = new DatabaseManager(databaseConfig);
