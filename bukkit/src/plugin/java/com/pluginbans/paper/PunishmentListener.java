@@ -3,9 +3,10 @@ package com.pluginbans.paper;
 import com.pluginbans.core.DurationFormatter;
 import com.pluginbans.core.PunishmentRecord;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import io.papermc.paper.event.player.AsyncChatEvent;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.AsyncChatEvent;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 
 import java.util.List;
@@ -40,6 +41,8 @@ public final class PunishmentListener implements Listener {
 
     @EventHandler
     public void onChat(AsyncChatEvent event) {
+        Component chatComponent = event.message();
+        String chatMessage = PlainTextComponentSerializer.plainText().serialize(chatComponent);
         List<PunishmentRecord> punishments = service.getActiveByUuid(event.getPlayer().getUniqueId()).join();
         boolean muted = punishments.stream().anyMatch(record -> record.type().equalsIgnoreCase("MUTE"));
         if (!muted) {
@@ -53,7 +56,8 @@ public final class PunishmentListener implements Listener {
         String message = service.messageService().applyPlaceholders(messages.muteMessage(), Map.of(
                 "%reason%", reason,
                 "%time%", DurationFormatter.formatSeconds(mute.durationSeconds()),
-                "%id%", mute.id()
+                "%id%", mute.id(),
+                "%message%", chatMessage
         ));
         event.setCancelled(true);
         service.runSync(() -> event.getPlayer().sendMessage(service.messageService().format(message)));
