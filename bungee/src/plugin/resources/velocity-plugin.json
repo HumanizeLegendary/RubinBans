@@ -1,0 +1,10 @@
+{
+  "id": "pluginbans",
+  "name": "PluginBans",
+  "version": "1.0.0",
+  "description": "Система наказаний.",
+  "authors": [
+    "PluginBans"
+  ],
+  "main": "com.pluginbans.velocity.PluginBansVelocity"
+}

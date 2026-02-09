@@ -1,0 +1,30 @@
+database:
+  type: SQLITE
+  pool-size: 10
+  sqlite:
+    file: pluginbans.db
+  mysql:
+    host: localhost
+    port: 3306
+    database: pluginbans
+    user: root
+    password: ""
+
+punish:
+  types:
+    - BAN
+    - MUTE
+    - WARN
+    - IPBAN
+    - IDBAN
+    - STAFF
+  nnr-types:
+    - STAFF
+  warn-duration-seconds: 1209600
+  nnr-hidden-reason: "Служебное наказание"
+  auto-ipban-reason: "Достигнут лимит предупреждений"
+
+rest:
+  enabled: true
+  bind: "0.0.0.0"
+  port: 8081

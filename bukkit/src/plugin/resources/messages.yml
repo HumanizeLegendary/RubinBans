@@ -1,0 +1,43 @@
+prefix: "<gray>[<aqua>PluginBans</aqua>]</gray> "
+
+ban_screen: |-
+  <gray>---------------------</gray>
+  <red>Вы были наказаны.</red>
+
+  <gray>Причина:</gray> <white>%reason%</white>
+  <gray>Длительность:</gray> <white>%time%</white>
+
+  <gray>ID:</gray> <white>%id%</white>
+  <gray>---------------------</gray>
+
+mute_message: |-
+  <gray>---------------------</gray>
+  <red>Вы были наказаны.</red>
+
+  <gray>Причина:</gray> <white>%reason%</white>
+  <gray>Длительность:</gray> <white>%time%</white>
+
+  <gray>ID:</gray> <white>%id%</white>
+  <gray>---------------------</gray>
+
+warn_message: |-
+  <gray>---------------------</gray>
+  <red>Вы были наказаны.</red>
+
+  <gray>Причина:</gray> <white>%reason%</white>
+  <gray>Длительность:</gray> <white>%time%</white>
+
+  <gray>ID:</gray> <white>%id%</white>
+  <gray>---------------------</gray>
+
+permission_denied: "<red>У вас нет прав на это действие.</red>"
+already_punished: "<red>Игрок уже наказан этим типом.</red>"
+join_denied: "<red>Доступ запрещен.</red>"
+
+errors:
+  usage: "<red>Неверное использование команды.</red>"
+  player_not_found: "<red>Игрок не найден.</red>"
+  duration: "<red>Неверный формат длительности.</red>"
+  reason: "<red>Укажите причину наказания.</red>"
+  type: "<red>Недопустимый тип наказания.</red>"
+  none: "<yellow>Активные наказания не найдены.</yellow>"

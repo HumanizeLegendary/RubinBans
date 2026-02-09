@@ -1,0 +1,44 @@
+name: PluginBans
+main: com.pluginbans.paper.PluginBansPaper
+version: 1.0.0
+api-version: "1.21"
+author: "PluginBans"
+commands:
+  ban:
+    description: "Выдать бан."
+    usage: "/ban <игрок|uuid> <длительность> <причина>"
+  ipban:
+    description: "Выдать IP-бан."
+    usage: "/ipban <игрок|uuid> <длительность> <причина>"
+  mute:
+    description: "Выдать мут."
+    usage: "/mute <игрок|uuid> <длительность> <причина>"
+  warn:
+    description: "Выдать предупреждение."
+    usage: "/warn <игрок|uuid> <причина>"
+  idban:
+    description: "Выдать ID-бан."
+    usage: "/idban <игрок|uuid> <длительность> <причина>"
+  punish:
+    description: "Выдать кастомное наказание."
+    usage: "/punish <uuid> <тип> <длительность> <причина>"
+  checkpunish:
+    description: "Проверить активные наказания."
+    usage: "/checkpunish <игрок|uuid>"
+permissions:
+  ban.ban:
+    default: op
+  ban.ipban:
+    default: op
+  ban.mute:
+    default: op
+  ban.warn:
+    default: op
+  ban.idban:
+    default: op
+  ban.punish:
+    default: op
+  ban.check:
+    default: op
+  ban.fullaccess:
+    default: op
