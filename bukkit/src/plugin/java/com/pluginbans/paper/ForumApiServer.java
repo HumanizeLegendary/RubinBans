@@ -152,12 +152,25 @@ public final class ForumApiServer implements AutoCloseable {
         String actor = isBlank(request.actor) ? "ForumAPI" : request.actor.trim();
         boolean silent = Boolean.TRUE.equals(request.silent);
         boolean nnr = Boolean.TRUE.equals(request.nnr);
+        String reason = request.reason.trim();
+        if (type == PunishmentType.WARN) {
+            Optional<String> normalizedWarnReason = service.normalizeWarnReason(reason);
+            if (normalizedWarnReason.isEmpty()) {
+                sendJson(exchange, 400, Map.of("ok", false, "error", "Invalid WARN reason. Allowed: " + plainWarnReasons()));
+                return;
+            }
+            if (!service.canIssueWarnFromExternalActor(actor)) {
+                sendJson(exchange, 403, Map.of("ok", false, "error", "WARN via API is allowed only for configured external actors"));
+                return;
+            }
+            reason = normalizedWarnReason.get();
+        }
 
         try {
             PunishmentRecord record = service.issuePunishment(
                     uuid.get(),
                     type.name(),
-                    request.reason.trim(),
+                    reason,
                     durationSeconds,
                     actor,
                     ip,
@@ -374,6 +387,18 @@ public final class ForumApiServer implements AutoCloseable {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String plainWarnReasons() {
+        StringBuilder builder = new StringBuilder();
+        List<String> reasons = config.warnAllowedReasons();
+        for (int i = 0; i < reasons.size(); i++) {
+            if (i > 0) {
+                builder.append(" | ");
+            }
+            builder.append(i + 1).append(") ").append(reasons.get(i));
+        }
+        return builder.toString();
     }
 
     private static final class CreatePunishmentRequest {

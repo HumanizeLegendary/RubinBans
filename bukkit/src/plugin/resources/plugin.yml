@@ -16,12 +16,13 @@ commands:
   mute:
     description: "Выдать мут."
     usage: "/mute <игрок|uuid> <длительность> <причина>"
+    aliases: ["pbmute", "amute"]
   warn:
     description: "Выдать предупреждение."
-    usage: "/warn <игрок|uuid> <причина>"
+    usage: "/warn <игрок|uuid> <причина(1|2)>"
   punish:
-    description: "Выдать кастомное наказание."
-    usage: "/punish <игрок|uuid> <тип> <длительность> <причина>"
+    description: "Выдать наказание через меню или вручную."
+    usage: "/punish <игрок|uuid> [тип длительность причина]"
   checkpunish:
     description: "Проверить наказание по ID."
     usage: "/checkpunish <id>"

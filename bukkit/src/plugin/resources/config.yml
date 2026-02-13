@@ -14,6 +14,19 @@ punish:
   warn-duration-seconds: 1209600
   auto-ban-reason: "Достигнут лимит предупреждений (3/3)"
   auto-ipban-reason: "Достигнут лимит предупреждений"
+  menu:
+    title: "<dark_red>Выдача наказания</dark_red>"
+    punishments: []
+
+sync:
+  poll-seconds: 2
+
+warn:
+  allowed-reasons:
+    - "Отказ от проверки"
+    - "Нарушение правил проверки"
+  external-actors:
+    - "CheckPlugin"
 
 check:
   duration-seconds: 900

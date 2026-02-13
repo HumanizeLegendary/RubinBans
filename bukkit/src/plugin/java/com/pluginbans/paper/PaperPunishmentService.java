@@ -16,8 +16,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
@@ -58,6 +60,13 @@ public final class PaperPunishmentService implements PunishmentListener {
         if (type == PunishmentType.BAN && durationSeconds > 0) {
             type = PunishmentType.TEMPBAN;
         }
+        if (type == PunishmentType.WARN) {
+            Optional<String> normalized = normalizeWarnReason(reason);
+            if (normalized.isEmpty()) {
+                return CompletableFuture.failedFuture(new IllegalArgumentException("Недопустимая причина WARN."));
+            }
+            reason = normalized.get();
+        }
         Instant start = Instant.now();
         Instant end = durationSeconds > 0 ? start.plusSeconds(durationSeconds) : null;
         String idCode = nnr ? "NNR" : (end == null ? "NV" : "TM");
@@ -83,6 +92,53 @@ public final class PaperPunishmentService implements PunishmentListener {
                 silent ? "да" : "нет"
         ));
         return punishmentService.createPunishment(record);
+    }
+
+    public Optional<String> normalizeWarnReason(String input) {
+        if (input == null) {
+            return Optional.empty();
+        }
+        String normalizedInput = normalize(input);
+        List<String> allowed = config.warnAllowedReasons();
+        try {
+            int index = Integer.parseInt(normalizedInput);
+            if (index >= 1 && index <= allowed.size()) {
+                return Optional.of(allowed.get(index - 1));
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        for (String reason : allowed) {
+            if (normalize(reason).equals(normalizedInput)) {
+                return Optional.of(reason);
+            }
+        }
+        return Optional.empty();
+    }
+
+    public boolean canIssueWarnFromExternalActor(String actor) {
+        if (actor == null || actor.isBlank()) {
+            return false;
+        }
+        String normalizedActor = normalize(actor);
+        return config.warnExternalActors().stream()
+                .map(this::normalize)
+                .anyMatch(normalizedActor::equals);
+    }
+
+    public String warnReasonsHint() {
+        StringBuilder builder = new StringBuilder();
+        List<String> allowed = config.warnAllowedReasons();
+        for (int i = 0; i < allowed.size(); i++) {
+            if (i > 0) {
+                builder.append(" <gray>|</gray> ");
+            }
+            builder.append("<white>").append(i + 1).append(") ").append(allowed.get(i)).append("</white>");
+        }
+        return builder.toString();
+    }
+
+    private String normalize(String value) {
+        return value.trim().toLowerCase(Locale.ROOT);
     }
 
     public PunishmentService core() {

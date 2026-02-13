@@ -9,6 +9,7 @@ import java.util.List;
 public record VelocityConfig(
         DatabaseConfig databaseConfig,
         List<String> lobbyServers,
+        int syncPollSeconds,
         int throttleMaxConnections,
         int throttleWindowSeconds,
         Path auditPath
@@ -17,6 +18,7 @@ public record VelocityConfig(
         return new VelocityConfig(
                 new DatabaseConfig(DatabaseType.SQLITE, "localhost", 3306, "pluginbans", "root", "", dataDirectory.resolve("pluginbans-velocity.db").toString(), 10),
                 List.of("lobby", "hub"),
+                2,
                 5,
                 10,
                 dataDirectory.resolve("audit.log")

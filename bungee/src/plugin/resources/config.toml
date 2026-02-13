@@ -1,5 +1,6 @@
 [pluginbans]
 lobby-servers = ["lobby", "hub"]
+sync-poll-seconds = 2
 
 [database]
 type = "SQLITE"

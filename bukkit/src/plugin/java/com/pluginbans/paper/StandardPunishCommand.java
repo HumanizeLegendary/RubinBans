@@ -66,6 +66,15 @@ public final class StandardPunishCommand implements CommandExecutor {
             service.messageService().send(sender, messages.error("reason"));
             return true;
         }
+        if (type == Type.WARN) {
+            Optional<String> normalizedWarn = service.normalizeWarnReason(reason);
+            if (normalizedWarn.isEmpty()) {
+                service.messageService().send(sender, "<red>Для WARN доступно только 2 причины.</red>");
+                service.messageService().send(sender, service.warnReasonsHint());
+                return true;
+            }
+            reason = normalizedWarn.get();
+        }
         boolean silent = hasFlag(args, "-s");
         boolean nnr = hasFlag(args, "-nnr");
         UUID target = uuid.get();
@@ -114,6 +123,9 @@ public final class StandardPunishCommand implements CommandExecutor {
             return;
         }
         service.messageService().send(sender, "<red>Использование:</red> <white>" + usage + "</white>");
+        if (type == Type.WARN) {
+            service.messageService().send(sender, "<gray>Разрешенные причины:</gray> " + service.warnReasonsHint());
+        }
     }
 
     private long parseDuration(String input, CommandSender sender) {

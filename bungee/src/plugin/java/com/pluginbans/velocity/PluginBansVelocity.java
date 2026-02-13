@@ -48,7 +48,10 @@ public final class PluginBansVelocity implements PunishmentListener {
     public void onProxyInitialization(com.velocitypowered.api.event.proxy.ProxyInitializeEvent event) {
         this.config = VelocityConfigLoader.load(dataDirectory);
         this.databaseManager = new DatabaseManager(config.databaseConfig());
-        this.punishmentService = new PunishmentService(new JdbcPunishmentRepository(databaseManager.dataSource(), databaseManager.executor()), Duration.ofSeconds(5));
+        this.punishmentService = new PunishmentService(
+                new JdbcPunishmentRepository(databaseManager.dataSource(), databaseManager.executor()),
+                Duration.ofSeconds(Math.max(1, config.syncPollSeconds()))
+        );
         this.punishmentService.registerListener(this);
         this.throttle = new ConnectionThrottle(config.throttleMaxConnections(), config.throttleWindowSeconds());
         this.auditLogger = new AuditLogger(config.auditPath());

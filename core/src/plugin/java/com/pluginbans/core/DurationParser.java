@@ -1,18 +1,25 @@
 package com.pluginbans.core;
 
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class DurationParser {
     private static final Pattern TOKEN = Pattern.compile("(\\d+)([smhd])");
+    private static final Set<String> PERMANENT_VALUES = Set.of(
+            "perm",
+            "permanent",
+            "forever",
+            "навсегда"
+    );
 
     private DurationParser() {
     }
 
     public static long parseToSeconds(String input) {
         String normalized = input.trim().toLowerCase(Locale.ROOT);
-        if (normalized.equals("навсегда")) {
+        if (PERMANENT_VALUES.contains(normalized)) {
             return 0L;
         }
         Matcher matcher = TOKEN.matcher(normalized);
