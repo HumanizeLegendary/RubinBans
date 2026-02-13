@@ -5,7 +5,7 @@ import com.pluginbans.core.DatabaseConfig;
 public record PaperConfig(
         DatabaseConfig databaseConfig,
         long warnDurationSeconds,
-        String autoIpbanReason,
+        String autoBanReason,
         long checkDurationSeconds,
         long checkTimeoutBanSeconds,
         String checkTimeoutBanReason,

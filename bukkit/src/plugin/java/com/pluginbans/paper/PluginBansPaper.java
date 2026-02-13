@@ -77,12 +77,15 @@ public final class PluginBansPaper extends JavaPlugin {
                 config.getInt("database.pool-size", 10)
         );
         long warnDuration = config.getLong("punish.warn-duration-seconds", 1209600L);
-        String autoIpbanReason = config.getString("punish.auto-ipban-reason", "Достигнут лимит предупреждений");
+        String autoBanReason = config.getString(
+                "punish.auto-ban-reason",
+                config.getString("punish.auto-ipban-reason", "Достигнут лимит предупреждений")
+        );
         long checkDurationSeconds = config.getLong("check.duration-seconds", 900L);
         long checkTimeoutBanSeconds = config.getLong("check.timeout-ban-seconds", 0L);
         String checkTimeoutBanReason = config.getString("check.timeout-ban-reason", "Проверка не пройдена");
         boolean muteBlockCommands = config.getBoolean("mute.block-commands", false);
-        return new PaperConfig(databaseConfig, warnDuration, autoIpbanReason, checkDurationSeconds, checkTimeoutBanSeconds, checkTimeoutBanReason, muteBlockCommands);
+        return new PaperConfig(databaseConfig, warnDuration, autoBanReason, checkDurationSeconds, checkTimeoutBanSeconds, checkTimeoutBanReason, muteBlockCommands);
     }
 
     private MessagesConfig loadMessages() {

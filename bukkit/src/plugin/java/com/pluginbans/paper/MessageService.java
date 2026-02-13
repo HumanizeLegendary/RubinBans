@@ -7,6 +7,9 @@ import org.bukkit.command.CommandSender;
 import java.util.Map;
 
 public final class MessageService {
+    private static final String LEGACY_PREFIX = "<gray>[<aqua>PluginBans</aqua>]</gray> ";
+    private static final String DEFAULT_PREFIX = "<red>БАНЫ | </red>";
+
     private final MessagesConfig messages;
     private final MiniMessage miniMessage;
 
@@ -20,7 +23,12 @@ public final class MessageService {
     }
 
     public Component format(String message) {
-        return miniMessage.deserialize(messages.prefix() + message);
+        String configuredPrefix = messages.prefix();
+        String prefix = configuredPrefix;
+        if (prefix == null || prefix.isBlank() || LEGACY_PREFIX.equals(prefix)) {
+            prefix = DEFAULT_PREFIX;
+        }
+        return miniMessage.deserialize(prefix + message);
     }
 
     public Component formatRaw(String message) {

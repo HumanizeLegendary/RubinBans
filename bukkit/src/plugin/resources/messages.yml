@@ -1,13 +1,14 @@
-prefix: "<gray>[<aqua>PluginBans</aqua>]</gray> "
+prefix: "<red>БАНЫ | </red>"
 
 ban: "<red>%player%</red> был забанен. <gray>Причина:</gray> <white>%reason%</white> <gray>Длительность:</gray> <white>%time%</white> <gray>Выдал:</gray> <white>%actor%</white>"
 mute: "<yellow>%player%</yellow> получил мут. <gray>Причина:</gray> <white>%reason%</white> <gray>Длительность:</gray> <white>%time%</white> <gray>Выдал:</gray> <white>%actor%</white>"
-warn: "<gold>%player%</gold> получил предупреждение. <gray>Причина:</gray> <white>%reason%</white> <gray>Выдал:</gray> <white>%actor%</white>"
+warn: "<gold>%player%</gold> получил варн (блокировка 14 дней). <gray>Причина:</gray> <white>%reason%</white> <gray>Выдал:</gray> <white>%actor%</white>"
 check: "<aqua>%player%</aqua> отправлен на проверку. <gray>Выдал:</gray> <white>%actor%</white>"
 
 kick: |-
   <red>Вы заблокированы.</red>
-  <gray>ID для апелляции:</gray> <white>%id%</white>
+
+  <gray>ID наказания:</gray> <white>%id%</white>
 
 check-block: "<red>Во время проверки чат заблокирован. Передайте AnyDesk код.</red>"
 muted-chat: "<red>Вы в муте.</red> <gray>Причина:</gray> <white>%reason%</white> <gray>Осталось:</gray> <white>%time%</white>"

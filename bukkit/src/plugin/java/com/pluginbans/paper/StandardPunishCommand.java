@@ -79,8 +79,10 @@ public final class StandardPunishCommand implements CommandExecutor {
                     if (type == Type.WARN) {
                         service.core().getActiveByUuid(target).thenAccept(active -> {
                             long warnCount = active.all().stream().filter(p -> p.type() == PunishmentType.WARN).count();
-                            if (warnCount >= 3 && ip != null) {
-                                service.issuePunishment(target, PunishmentType.IPBAN.name(), service.config().autoIpbanReason(), 0L, "Система", ip, false, false);
+                            boolean hasActiveBan = active.all().stream().anyMatch(p ->
+                                    p.type() == PunishmentType.BAN || p.type() == PunishmentType.TEMPBAN || p.type() == PunishmentType.IPBAN);
+                            if (warnCount >= 3 && !hasActiveBan) {
+                                service.issuePunishment(target, PunishmentType.BAN.name(), service.config().autoBanReason(), 0L, "Система", ip, false, false);
                             }
                         });
                     }

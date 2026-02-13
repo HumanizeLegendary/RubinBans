@@ -3,6 +3,7 @@ package com.pluginbans.velocity;
 import com.google.inject.Inject;
 import com.pluginbans.core.AuditLogger;
 import com.pluginbans.core.DatabaseManager;
+import com.pluginbans.core.IpHashing;
 import com.pluginbans.core.JdbcPunishmentRepository;
 import com.pluginbans.core.PunishmentCreateEvent;
 import com.pluginbans.core.PunishmentListener;
@@ -63,14 +64,18 @@ public final class PluginBansVelocity implements PunishmentListener {
         UUID uuid = event.getUniqueId();
         List<PunishmentRecord> punishments = new java.util.ArrayList<>(punishmentService.getActiveByUuid(uuid).join().all());
         punishments.addAll(punishmentService.getActiveByIp(ip).join());
+        punishments.addAll(punishmentService.getActiveByIpHash(IpHashing.hash(ip)).join());
         Optional<PunishmentRecord> ban = punishments.stream()
                 .filter(record -> record.type() == PunishmentType.BAN
                         || record.type() == PunishmentType.TEMPBAN
-                        || record.type() == PunishmentType.IPBAN)
+                        || record.type() == PunishmentType.IPBAN
+                        || record.type() == PunishmentType.WARN)
                 .findFirst();
         if (ban.isPresent()) {
             auditLogger.log("Теневой вход: %s заблокирован (тип %s)".formatted(uuid, ban.get().type().name()));
-            event.setResult(PreLoginEvent.PreLoginComponentResult.denied(Component.text("Доступ запрещен. Вы заблокированы.")));
+            event.setResult(PreLoginEvent.PreLoginComponentResult.denied(Component.text(
+                    "Вы заблокированы.\nID наказания: " + ban.get().internalId()
+            )));
         }
     }
 
@@ -107,10 +112,14 @@ public final class PluginBansVelocity implements PunishmentListener {
     @Override
     public void onCreate(PunishmentCreateEvent event) {
         PunishmentRecord record = event.record();
-        if (record.type() != PunishmentType.BAN && record.type() != PunishmentType.TEMPBAN && record.type() != PunishmentType.IPBAN) {
+        if (record.type() != PunishmentType.BAN
+                && record.type() != PunishmentType.TEMPBAN
+                && record.type() != PunishmentType.IPBAN
+                && record.type() != PunishmentType.WARN) {
             return;
         }
-        proxy.getPlayer(record.uuid()).ifPresent(player -> player.disconnect(Component.text("Доступ запрещен. Вы заблокированы.")));
+        proxy.getPlayer(record.uuid()).ifPresent(player ->
+                player.disconnect(Component.text("Вы заблокированы.\nID наказания: " + record.internalId())));
     }
 
     @Subscribe

@@ -46,7 +46,8 @@ public final class PunishmentListener implements Listener {
         Optional<PunishmentRecord> ban = punishments.stream()
                 .filter(record -> record.type() == PunishmentType.BAN
                         || record.type() == PunishmentType.TEMPBAN
-                        || record.type() == PunishmentType.IPBAN)
+                        || record.type() == PunishmentType.IPBAN
+                        || record.type() == PunishmentType.WARN)
                 .findFirst();
         if (ban.isEmpty()) {
             return;
@@ -131,7 +132,8 @@ public final class PunishmentListener implements Listener {
             Optional<PunishmentRecord> ban = punishments.stream()
                     .filter(record -> record.type() == PunishmentType.BAN
                             || record.type() == PunishmentType.TEMPBAN
-                            || record.type() == PunishmentType.IPBAN)
+                            || record.type() == PunishmentType.IPBAN
+                            || record.type() == PunishmentType.WARN)
                     .findFirst();
             if (ban.isPresent()) {
                 PunishmentRecord record = ban.get();

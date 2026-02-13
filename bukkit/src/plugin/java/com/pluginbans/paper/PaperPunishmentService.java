@@ -118,7 +118,7 @@ public final class PaperPunishmentService implements PunishmentListener {
             return;
         }
         if (record.type() == PunishmentType.WARN) {
-            sendPunished(record, messages.warnMessage());
+            kickIfOnline(record);
             broadcast(record, messages.warnMessage());
             return;
         }
@@ -140,7 +140,9 @@ public final class PaperPunishmentService implements PunishmentListener {
                 "%time%", time,
                 "%actor%", record.actor()
         ));
-        runSync(() -> Bukkit.broadcast(messageService.format(message), "bans.fullaccess"));
+        runSync(() -> Bukkit.getOnlinePlayers().stream()
+                .filter(this::canReceiveNotifications)
+                .forEach(player -> player.sendMessage(messageService.format(message))));
     }
 
     private void sendPunished(PunishmentRecord record, String template) {
@@ -172,5 +174,15 @@ public final class PaperPunishmentService implements PunishmentListener {
                 "%id%", record.internalId()
         ));
         runSync(() -> player.kick(messageService.formatRaw(message)));
+    }
+
+    private boolean canReceiveNotifications(Player player) {
+        return player.hasPermission("bans.fullaccess")
+                || player.hasPermission("bans.ban")
+                || player.hasPermission("bans.tempban")
+                || player.hasPermission("bans.ipban")
+                || player.hasPermission("bans.warn")
+                || player.hasPermission("bans.check")
+                || player.hasPermission("bans.punish");
     }
 }

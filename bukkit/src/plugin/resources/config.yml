@@ -12,6 +12,7 @@ database:
 
 punish:
   warn-duration-seconds: 1209600
+  auto-ban-reason: "Достигнут лимит предупреждений (3/3)"
   auto-ipban-reason: "Достигнут лимит предупреждений"
 
 check:
