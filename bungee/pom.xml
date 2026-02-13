@@ -33,6 +33,19 @@
             <artifactId>velocity-api</artifactId>
             <version>3.4.0-20260121.190037-118</version>
             <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.velocitypowered</groupId>
+                    <artifactId>velocity-brigadier</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>com.velocitypowered</groupId>
+            <artifactId>velocity-brigadier</artifactId>
+            <version>1.0.0-20210613.082804-10</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
