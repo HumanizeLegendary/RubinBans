@@ -10,6 +10,7 @@ import com.pluginbans.core.PunishmentRecord;
 import com.pluginbans.core.PunishmentService;
 import com.pluginbans.core.PunishmentType;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -132,53 +133,60 @@ public final class PaperPunishmentService implements PunishmentListener {
         if (record.silent()) {
             return;
         }
-        String playerName = java.util.Optional.ofNullable(org.bukkit.Bukkit.getOfflinePlayer(record.uuid()).getName()).orElse(record.uuid().toString());
-        String time = DurationFormatter.formatSeconds(record.durationSeconds());
-        String rendered = messageService.applyPlaceholders(template, Map.of(
-                "%player%", playerName,
-                "%reason%", record.reason(),
-                "%time%", time,
-                "%actor%", record.actor(),
-                "%id%", record.internalId()
-        ));
-        String message = ensureIdInMessage(template, rendered, record.internalId());
-        runSync(() -> Bukkit.getOnlinePlayers().stream()
-                .filter(this::canReceiveNotifications)
-                .forEach(player -> player.sendMessage(messageService.format(message))));
+        runSync(() -> {
+            OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(record.uuid());
+            String playerName = java.util.Optional.ofNullable(offlinePlayer.getName()).orElse(record.uuid().toString());
+            String time = DurationFormatter.formatSeconds(record.durationSeconds());
+            String rendered = messageService.applyPlaceholders(template, Map.of(
+                    "%player%", playerName,
+                    "%reason%", record.reason(),
+                    "%time%", time,
+                    "%actor%", record.actor(),
+                    "%id%", record.internalId()
+            ));
+            String message = ensureIdInMessage(template, rendered, record.internalId());
+            Bukkit.getOnlinePlayers().stream()
+                    .filter(this::canReceiveNotifications)
+                    .forEach(player -> player.sendMessage(messageService.format(message)));
+        });
     }
 
     private void sendPunished(PunishmentRecord record, String template) {
-        Player player = Bukkit.getPlayer(record.uuid());
-        if (player == null) {
-            return;
-        }
-        String playerName = player.getName();
-        String time = DurationFormatter.formatSeconds(record.durationSeconds());
-        String rendered = messageService.applyPlaceholders(template, Map.of(
-                "%player%", playerName,
-                "%reason%", record.reason(),
-                "%time%", time,
-                "%actor%", record.actor(),
-                "%id%", record.internalId()
-        ));
-        String message = ensureIdInMessage(template, rendered, record.internalId());
-        runSync(() -> player.sendMessage(messageService.format(message)));
+        runSync(() -> {
+            Player player = Bukkit.getPlayer(record.uuid());
+            if (player == null) {
+                return;
+            }
+            String playerName = player.getName();
+            String time = DurationFormatter.formatSeconds(record.durationSeconds());
+            String rendered = messageService.applyPlaceholders(template, Map.of(
+                    "%player%", playerName,
+                    "%reason%", record.reason(),
+                    "%time%", time,
+                    "%actor%", record.actor(),
+                    "%id%", record.internalId()
+            ));
+            String message = ensureIdInMessage(template, rendered, record.internalId());
+            player.sendMessage(messageService.format(message));
+        });
     }
 
     private void kickIfOnline(PunishmentRecord record) {
-        Player player = Bukkit.getPlayer(record.uuid());
-        if (player == null) {
-            return;
-        }
-        String time = DurationFormatter.formatSeconds(record.durationSeconds());
-        String rendered = messageService.applyPlaceholders(messages.kickMessage(), Map.of(
-                "%reason%", record.reason(),
-                "%time%", time,
-                "%actor%", record.actor(),
-                "%id%", record.internalId()
-        ));
-        String message = ensureIdInMessage(messages.kickMessage(), rendered, record.internalId());
-        runSync(() -> player.kick(messageService.formatRaw(message)));
+        runSync(() -> {
+            Player player = Bukkit.getPlayer(record.uuid());
+            if (player == null) {
+                return;
+            }
+            String time = DurationFormatter.formatSeconds(record.durationSeconds());
+            String rendered = messageService.applyPlaceholders(messages.kickMessage(), Map.of(
+                    "%reason%", record.reason(),
+                    "%time%", time,
+                    "%actor%", record.actor(),
+                    "%id%", record.internalId()
+            ));
+            String message = ensureIdInMessage(messages.kickMessage(), rendered, record.internalId());
+            player.kick(messageService.formatRaw(message));
+        });
     }
 
     private String ensureIdInMessage(String template, String rendered, String id) {
