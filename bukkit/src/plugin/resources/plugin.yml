@@ -25,6 +25,9 @@ commands:
   checkpunish:
     description: "Проверить наказание по ID."
     usage: "/checkpunish <id>"
+  unpunish:
+    description: "Снять наказание по ID."
+    usage: "/unpunish <id> [причина]"
 permissions:
   bans.ban:
     default: op
@@ -39,6 +42,8 @@ permissions:
   bans.punish:
     default: op
   bans.check:
+    default: op
+  bans.unpunish:
     default: op
   bans.fullaccess:
     default: op

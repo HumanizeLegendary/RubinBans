@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
+import java.util.function.Supplier;
 
 public final class PaperPunishmentService implements PunishmentListener {
     private final Plugin plugin;
@@ -102,6 +103,18 @@ public final class PaperPunishmentService implements PunishmentListener {
 
     public void runSync(Runnable runnable) {
         Bukkit.getScheduler().runTask(plugin, runnable);
+    }
+
+    public <T> CompletableFuture<T> supplySync(Supplier<T> supplier) {
+        CompletableFuture<T> future = new CompletableFuture<>();
+        runSync(() -> {
+            try {
+                future.complete(supplier.get());
+            } catch (Throwable throwable) {
+                future.completeExceptionally(throwable);
+            }
+        });
+        return future;
     }
 
     public void logError(String message, Throwable throwable) {

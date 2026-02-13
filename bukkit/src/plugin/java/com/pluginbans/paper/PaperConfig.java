@@ -9,6 +9,10 @@ public record PaperConfig(
         long checkDurationSeconds,
         long checkTimeoutBanSeconds,
         String checkTimeoutBanReason,
-        boolean muteBlockCommands
+        boolean muteBlockCommands,
+        boolean apiEnabled,
+        String apiBind,
+        int apiPort,
+        String apiToken
 ) {
 }

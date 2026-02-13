@@ -11,22 +11,25 @@
 | `/ipban <игрок|uuid> <длительность> <причина>` | IP-бан. |
 | `/mute <игрок|uuid> <длительность> <причина>` | Блокировка чата. |
 | `/warn <игрок|uuid> <причина>` | Предупреждение (длительность по конфигу). |
-| `/idban <игрок|uuid> <длительность> <причина>` | ID-бан. |
 | `/punish <uuid> <тип> <длительность> <причина>` | Кастомное наказание напрямую в БД. |
 | `/checkpunish <id>` | Проверка наказания по ID. |
+| `/unpunish <id> [причина]` | Снятие наказания по ID. |
+
+`/checkpunish` показывает кнопку `РАЗБАНИТЬ` для активного наказания.
 
 Длительность: `1d2h30m`, `15m`, `perm`/`permanent`/`навсегда` для бессрочных.
 
 ## Права
 
-* `ban.ban`
-* `ban.ipban`
-* `ban.mute`
-* `ban.warn`
-* `ban.idban`
-* `ban.punish`
-* `ban.check`
-* `ban.fullaccess` — доступ ко всем операциям, включая NNR.
+* `bans.ban`
+* `bans.tempban`
+* `bans.ipban`
+* `bans.mute`
+* `bans.warn`
+* `bans.punish`
+* `bans.check`
+* `bans.unpunish`
+* `bans.fullaccess` — доступ ко всем операциям.
 
 ## База данных
 
@@ -68,27 +71,58 @@ NNR-наказания настраиваются через список `punis
 
 ## Velocity-синхронизация
 
-* При выдаче наказания Paper отправляет плагин-сообщение в Velocity.
-* Velocity проверяет наказания при входе и мгновенно отключает игрока при синхронизации.
+* Синхронизация выполняется через общую базу данных.
+* Velocity проверяет наказания при входе и мгновенно отключает игрока.
 * Обход через лобби не допускается.
 
 Конфигурация Velocity: `plugins/PluginBans/velocity-config.json`.
 
-## REST API
+## Forum API
 
-`GET /punishment/<id>` — возвращает JSON:
+Встроенный API для интеграции с форумом включается в `plugins/PluginBans/config.yml`:
+
+```yaml
+api:
+  enabled: true
+  bind: "127.0.0.1"
+  port: 8777
+  token: "PASTE_LONG_RANDOM_TOKEN"
+```
+
+Авторизация:
+* `X-API-Token: <token>`
+* или `Authorization: Bearer <token>`
+
+Базовый путь: `/api/v1`
+
+Основные endpoint'ы:
+* `GET /api/v1/health` — проверка доступности API
+* `GET /api/v1/punishments/{id}` — получить наказание по ID
+* `POST /api/v1/punishments` — выдать наказание
+* `POST /api/v1/punishments/{id}/revoke` — снять наказание
+* `GET /api/v1/players/{target}/active` — активные наказания игрока
+* `GET /api/v1/players/{target}/history` — история наказаний игрока
+
+Пример выдачи наказания:
 ```json
 {
-  "uuid": "UUID",
+  "target": "playerNameOrUuid",
   "type": "BAN",
   "reason": "Причина",
-  "duration": 3600,
-  "issuedBy": "Админ",
-  "timestamp": 1710000000000
+  "duration": "1d2h",
+  "actor": "Forum",
+  "silent": false,
+  "nnr": false
 }
 ```
 
-Настройки REST доступны в `config.yml` (`rest.enabled`, `rest.bind`, `rest.port`).
+Пример снятия наказания:
+```json
+{
+  "actor": "ForumModerator",
+  "reason": "Апелляция одобрена"
+}
+```
 
 ## DiscordBridge
 
@@ -99,7 +133,7 @@ NNR-наказания настраиваются через список `punis
   "type": "BAN",
   "reason": "Причина",
   "duration": 3600,
-  "id": "PBRB-TM-ABCDE"
+  "id": "A1B2C3"
 }
 ```
 

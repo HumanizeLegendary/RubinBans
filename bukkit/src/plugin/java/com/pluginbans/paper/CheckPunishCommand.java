@@ -78,6 +78,14 @@ public final class CheckPunishCommand implements CommandExecutor {
         service.messageService().send(sender, "<gray>Выдано:</gray> <white>" + DATE_FORMATTER.format(record.startTime()) + "</white>");
         service.messageService().send(sender, "<gray>Окончание:</gray> <white>" + endAt + "</white>");
         service.messageService().send(sender, "<gray>Осталось:</gray> <white>" + remaining + "</white>");
+        if (record.active()) {
+            String command = "/unpunish " + record.internalId() + " Снято_через_checkpunish";
+            String button = "<click:run_command:'" + command + "'>"
+                    + "<hover:show_text:'<green>Нажмите, чтобы снять наказание</green>'>"
+                    + "<green><bold>[ РАЗБАНИТЬ ]</bold></green>"
+                    + "</hover></click>";
+            service.messageService().send(sender, button);
+        }
         service.messageService().send(sender, "<gray>--------------------------------</gray>");
     }
 }

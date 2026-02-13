@@ -22,3 +22,9 @@ check:
 
 mute:
   block-commands: false
+
+api:
+  enabled: false
+  bind: "127.0.0.1"
+  port: 8777
+  token: "CHANGE_ME_LONG_RANDOM_TOKEN"

@@ -21,6 +21,7 @@ public final class PluginBansPaper extends JavaPlugin {
     private DatabaseManager databaseManager;
     private PunishmentRepository repository;
     private PaperPunishmentService punishmentService;
+    private ForumApiServer forumApiServer;
     private MessagesConfig messages;
     private PunishmentService coreService;
     private CheckManager checkManager;
@@ -39,10 +40,14 @@ public final class PluginBansPaper extends JavaPlugin {
         this.coreService.registerListener(punishmentService);
         registerCommands();
         registerListeners();
+        startApiServer(config);
     }
 
     @Override
     public void onDisable() {
+        if (forumApiServer != null) {
+            forumApiServer.close();
+        }
         if (coreService != null) {
             coreService.close();
         }
@@ -59,6 +64,7 @@ public final class PluginBansPaper extends JavaPlugin {
         registerCommandExecutor("warn", new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.WARN));
         registerCommandExecutor("punish", new CustomPunishCommand(punishmentService, messages));
         registerCommandExecutor("checkpunish", new CheckPunishCommand(punishmentService, messages));
+        registerCommandExecutor("unpunish", new UnpunishCommand(punishmentService, messages));
     }
 
     private void registerListeners() {
@@ -87,7 +93,23 @@ public final class PluginBansPaper extends JavaPlugin {
         long checkTimeoutBanSeconds = config.getLong("check.timeout-ban-seconds", 0L);
         String checkTimeoutBanReason = config.getString("check.timeout-ban-reason", "Проверка не пройдена");
         boolean muteBlockCommands = config.getBoolean("mute.block-commands", false);
-        return new PaperConfig(databaseConfig, warnDuration, autoBanReason, checkDurationSeconds, checkTimeoutBanSeconds, checkTimeoutBanReason, muteBlockCommands);
+        boolean apiEnabled = config.getBoolean("api.enabled", false);
+        String apiBind = config.getString("api.bind", "127.0.0.1");
+        int apiPort = config.getInt("api.port", 8777);
+        String apiToken = config.getString("api.token", "CHANGE_ME");
+        return new PaperConfig(
+                databaseConfig,
+                warnDuration,
+                autoBanReason,
+                checkDurationSeconds,
+                checkTimeoutBanSeconds,
+                checkTimeoutBanReason,
+                muteBlockCommands,
+                apiEnabled,
+                apiBind,
+                apiPort,
+                apiToken
+        );
     }
 
     private MessagesConfig loadMessages() {
@@ -98,6 +120,19 @@ public final class PluginBansPaper extends JavaPlugin {
 
     private Path auditPath() {
         return getDataFolder().toPath().resolve("audit.log");
+    }
+
+    private void startApiServer(PaperConfig config) {
+        if (!config.apiEnabled()) {
+            return;
+        }
+        try {
+            this.forumApiServer = new ForumApiServer(punishmentService, config);
+            this.forumApiServer.start();
+            getLogger().info("Forum API enabled on " + config.apiBind() + ":" + config.apiPort());
+        } catch (Exception exception) {
+            getLogger().severe("Failed to start Forum API: " + exception.getMessage());
+        }
     }
 
     private void registerCommandExecutor(String commandName, CommandExecutor executor) {
