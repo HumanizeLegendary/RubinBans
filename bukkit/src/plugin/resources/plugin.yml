@@ -16,29 +16,24 @@ commands:
   warn:
     description: "Выдать предупреждение."
     usage: "/warn <игрок|uuid> <причина>"
-  idban:
-    description: "Выдать ID-бан."
-    usage: "/idban <игрок|uuid> <длительность> <причина>"
   punish:
     description: "Выдать кастомное наказание."
-    usage: "/punish <uuid> <тип> <длительность> <причина>"
+    usage: "/punish <игрок|uuid> <тип> <длительность> <причина>"
   checkpunish:
-    description: "Проверить активные наказания."
-    usage: "/checkpunish <игрок|uuid>"
+    description: "Отправить на проверку."
+    usage: "/checkpunish <игрок|uuid> [длительность] [причина]"
 permissions:
-  ban.ban:
+  bans.ban:
     default: op
-  ban.ipban:
+  bans.ipban:
     default: op
-  ban.mute:
+  bans.mute:
     default: op
-  ban.warn:
+  bans.warn:
     default: op
-  ban.idban:
+  bans.punish:
     default: op
-  ban.punish:
+  bans.check:
     default: op
-  ban.check:
-    default: op
-  ban.fullaccess:
+  bans.fullaccess:
     default: op

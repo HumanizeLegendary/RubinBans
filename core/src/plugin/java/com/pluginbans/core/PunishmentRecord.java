@@ -4,25 +4,33 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record PunishmentRecord(
-        String id,
         UUID uuid,
-        String type,
-        String reason,
-        long durationSeconds,
-        String issuedBy,
-        Instant issuedAt,
         String ip,
+        String ipHash,
+        PunishmentType type,
+        String reason,
+        String actor,
+        Instant startTime,
+        Instant endTime,
         boolean active,
-        boolean nnr
+        String internalId,
+        boolean silent
 ) {
     public boolean isPermanent() {
-        return durationSeconds <= 0;
+        return endTime == null;
     }
 
-    public Instant expiresAt() {
-        if (isPermanent()) {
-            return null;
+    public boolean isExpired(Instant now) {
+        if (endTime == null) {
+            return false;
         }
-        return issuedAt.plusSeconds(durationSeconds);
+        return endTime.isBefore(now) || endTime.equals(now);
+    }
+
+    public long durationSeconds() {
+        if (endTime == null) {
+            return 0L;
+        }
+        return Math.max(0L, endTime.getEpochSecond() - startTime.getEpochSecond());
     }
 }

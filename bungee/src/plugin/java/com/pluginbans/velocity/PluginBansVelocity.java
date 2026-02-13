@@ -1,42 +1,41 @@
 package com.pluginbans.velocity;
 
-import com.google.gson.Gson;
-import com.pluginbans.core.DatabaseConfig;
+import com.google.inject.Inject;
+import com.pluginbans.core.AuditLogger;
 import com.pluginbans.core.DatabaseManager;
-import com.pluginbans.core.DatabaseType;
 import com.pluginbans.core.JdbcPunishmentRepository;
-import com.pluginbans.core.PunishmentRepository;
+import com.pluginbans.core.PunishmentCreateEvent;
+import com.pluginbans.core.PunishmentListener;
+import com.pluginbans.core.PunishmentRecord;
+import com.pluginbans.core.PunishmentService;
+import com.pluginbans.core.PunishmentType;
 import com.velocitypowered.api.event.PostOrder;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.PreLoginEvent;
-import com.velocitypowered.api.event.connection.PluginMessageEvent;
+import com.velocitypowered.api.event.connection.PostLoginEvent;
+import com.velocitypowered.api.event.player.ServerPreConnectEvent;
+import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.ProxyServer;
-import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
-import com.google.inject.Inject;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Plugin(id = "pluginbans", name = "PluginBans", version = "1.0.0", description = "Система наказаний.")
-public final class PluginBansVelocity {
-    private static final MinecraftChannelIdentifier CHANNEL = MinecraftChannelIdentifier.from("pluginbans:sync");
+public final class PluginBansVelocity implements PunishmentListener {
     private final ProxyServer proxy;
     private final Path dataDirectory;
     private DatabaseManager databaseManager;
-    private PunishmentRepository repository;
-    private VelocityPunishmentService punishmentService;
-    private VelocityMessages messages;
-    private final MiniMessage miniMessage = MiniMessage.miniMessage();
+    private PunishmentService punishmentService;
+    private VelocityConfig config;
+    private ConnectionThrottle throttle;
+    private AuditLogger auditLogger;
 
     @Inject
     public PluginBansVelocity(ProxyServer proxy, @DataDirectory Path dataDirectory) {
@@ -46,79 +45,80 @@ public final class PluginBansVelocity {
 
     @Subscribe
     public void onProxyInitialization(com.velocitypowered.api.event.proxy.ProxyInitializeEvent event) {
-        VelocityConfig config = loadConfig(dataDirectory);
-        DatabaseConfig databaseConfig = new DatabaseConfig(
-                DatabaseType.valueOf(config.database().type()),
-                config.database().host(),
-                config.database().port(),
-                config.database().database(),
-                config.database().user(),
-                config.database().password(),
-                dataDirectory.resolve("pluginbans-velocity.db").toString(),
-                config.database().poolSize()
-        );
-        this.databaseManager = new DatabaseManager(databaseConfig);
-        this.repository = new JdbcPunishmentRepository(databaseManager.dataSource(), databaseManager.executor());
-        this.punishmentService = new VelocityPunishmentService(repository, config.nnrHiddenReason());
-        this.messages = config.messages();
-        proxy.getChannelRegistrar().register(CHANNEL);
+        this.config = VelocityConfigLoader.load(dataDirectory);
+        this.databaseManager = new DatabaseManager(config.databaseConfig());
+        this.punishmentService = new PunishmentService(new JdbcPunishmentRepository(databaseManager.dataSource(), databaseManager.executor()), Duration.ofSeconds(5));
+        this.punishmentService.registerListener(this);
+        this.throttle = new ConnectionThrottle(config.throttleMaxConnections(), config.throttleWindowSeconds());
+        this.auditLogger = new AuditLogger(config.auditPath());
     }
 
     @Subscribe(order = PostOrder.FIRST)
     public void onPreLogin(PreLoginEvent event) {
         String ip = event.getConnection().getRemoteAddress().getAddress().getHostAddress();
+        if (!throttle.tryAcquire(ip)) {
+            event.setResult(PreLoginEvent.PreLoginComponentResult.denied(Component.text("Слишком много подключений. Подождите.")));
+            return;
+        }
         UUID uuid = event.getUniqueId();
-        Optional<Component> denial = punishmentService.buildDenial(uuid, ip, messages, miniMessage);
-        if (denial.isPresent()) {
-            event.setResult(PreLoginEvent.PreLoginComponentResult.denied(denial.get()));
+        List<PunishmentRecord> punishments = new java.util.ArrayList<>(punishmentService.getActiveByUuid(uuid).join().all());
+        punishments.addAll(punishmentService.getActiveByIp(ip).join());
+        Optional<PunishmentRecord> ban = punishments.stream()
+                .filter(record -> record.type() == PunishmentType.BAN
+                        || record.type() == PunishmentType.TEMPBAN
+                        || record.type() == PunishmentType.IPBAN)
+                .findFirst();
+        if (ban.isPresent()) {
+            auditLogger.log("Теневой вход: %s заблокирован (тип %s)".formatted(uuid, ban.get().type().name()));
+            event.setResult(PreLoginEvent.PreLoginComponentResult.denied(Component.text("Доступ запрещен. Вы заблокированы.")));
         }
     }
 
     @Subscribe
-    public void onPluginMessage(PluginMessageEvent event) {
-        if (!event.getIdentifier().equals(CHANNEL)) {
+    public void onPostLogin(PostLoginEvent event) {
+        UUID uuid = event.getPlayer().getUniqueId();
+        String ip = event.getPlayer().getRemoteAddress().getAddress().getHostAddress();
+        punishmentService.track(uuid, ip);
+    }
+
+    @Subscribe
+    public void onDisconnect(DisconnectEvent event) {
+        punishmentService.untrack(event.getPlayer().getUniqueId());
+    }
+
+    @Subscribe
+    public void onServerPreConnect(ServerPreConnectEvent event) {
+        String target = event.getOriginalServer().getServerInfo().getName();
+        if (config.lobbyServers().contains(target)) {
             return;
         }
-        try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(event.getData()))) {
-            String action = input.readUTF();
-            if (!"НАКАЗАНИЕ".equals(action)) {
-                return;
-            }
-            UUID uuid = UUID.fromString(input.readUTF());
-            proxy.getPlayer(uuid).ifPresent(player -> {
-                Optional<Component> denial = punishmentService.buildDenial(uuid, player.getRemoteAddress().getAddress().getHostAddress(), messages, miniMessage);
-                denial.ifPresent(player::disconnect);
-            });
-        } catch (IOException exception) {
-            throw new IllegalStateException("Не удалось обработать сообщение синхронизации.", exception);
+        UUID uuid = event.getPlayer().getUniqueId();
+        PunishmentType type = punishmentService.getActiveByUuid(uuid).join().all().stream()
+                .map(PunishmentRecord::type)
+                .filter(punishment -> punishment == PunishmentType.WARN || punishment == PunishmentType.CHECK)
+                .findFirst()
+                .orElse(null);
+        if (type != null) {
+            event.setResult(ServerPreConnectEvent.ServerResult.denied(Component.text("Вы на проверке")));
         }
+    }
+
+    @Override
+    public void onCreate(PunishmentCreateEvent event) {
+        PunishmentRecord record = event.record();
+        if (record.type() != PunishmentType.BAN && record.type() != PunishmentType.TEMPBAN && record.type() != PunishmentType.IPBAN) {
+            return;
+        }
+        proxy.getPlayer(record.uuid()).ifPresent(player -> player.disconnect(Component.text("Доступ запрещен. Вы заблокированы.")));
     }
 
     @Subscribe
     public void onShutdown(ProxyShutdownEvent event) {
+        if (punishmentService != null) {
+            punishmentService.close();
+        }
         if (databaseManager != null) {
             databaseManager.close();
-        }
-    }
-
-    private VelocityConfig loadConfig(Path dataDirectory) {
-        try {
-            if (!Files.exists(dataDirectory)) {
-                Files.createDirectories(dataDirectory);
-            }
-            Path configPath = dataDirectory.resolve("velocity-config.json");
-            if (!Files.exists(configPath)) {
-                try (var input = getClass().getResourceAsStream("/velocity-config.json")) {
-                    if (input == null) {
-                        throw new IllegalStateException("Отсутствует velocity-config.json в ресурсах.");
-                    }
-                    Files.copy(input, configPath);
-                }
-            }
-            String json = Files.readString(configPath);
-            return new Gson().fromJson(json, VelocityConfig.class);
-        } catch (IOException exception) {
-            throw new IllegalStateException("Не удалось загрузить конфигурацию Velocity.", exception);
         }
     }
 }

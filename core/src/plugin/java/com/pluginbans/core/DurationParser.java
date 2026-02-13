@@ -12,7 +12,7 @@ public final class DurationParser {
 
     public static long parseToSeconds(String input) {
         String normalized = input.trim().toLowerCase(Locale.ROOT);
-        if (normalized.equals("perm") || normalized.equals("permanent") || normalized.equals("навсегда")) {
+        if (normalized.equals("навсегда")) {
             return 0L;
         }
         Matcher matcher = TOKEN.matcher(normalized);

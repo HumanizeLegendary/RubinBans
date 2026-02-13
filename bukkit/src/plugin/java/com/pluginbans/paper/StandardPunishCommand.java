@@ -1,21 +1,22 @@
 package com.pluginbans.paper;
 
 import com.pluginbans.core.DurationParser;
-import com.pluginbans.core.PunishmentRecord;
+import com.pluginbans.core.PunishmentType;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
 public final class StandardPunishCommand implements CommandExecutor {
     enum Type {
-        BAN("BAN", "ban.ban"),
-        IPBAN("IPBAN", "ban.ipban"),
-        MUTE("MUTE", "ban.mute"),
-        WARN("WARN", "ban.warn"),
-        IDBAN("IDBAN", "ban.idban");
+        BAN("BAN", "bans.ban"),
+        IPBAN("IPBAN", "bans.ipban"),
+        MUTE("MUTE", "bans.mute"),
+        WARN("WARN", "bans.warn"),
+        CHECK("CHECK", "bans.check");
 
         private final String typeName;
         private final String permission;
@@ -38,7 +39,7 @@ public final class StandardPunishCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!sender.hasPermission(type.permission) && !sender.hasPermission("ban.fullaccess")) {
+        if (!sender.hasPermission(type.permission) && !sender.hasPermission("bans.fullaccess")) {
             service.messageService().send(sender, messages.permissionDenied());
             return true;
         }
@@ -51,71 +52,63 @@ public final class StandardPunishCommand implements CommandExecutor {
             service.messageService().send(sender, messages.error("player_not_found"));
             return true;
         }
-        long durationSeconds;
-        String reasonStart;
-        if (type == Type.WARN) {
-            durationSeconds = service.config().warnDurationSeconds();
-            reasonStart = joinArgs(args, 1);
-        } else {
-            if (args.length < 3) {
-                service.messageService().send(sender, messages.error("usage"));
-                return true;
-            }
-            try {
-                durationSeconds = DurationParser.parseToSeconds(args[1]);
-            } catch (IllegalArgumentException exception) {
-                service.messageService().send(sender, messages.error("duration"));
-                return true;
-            }
-            reasonStart = joinArgs(args, 2);
+        long durationSeconds = type == Type.WARN ? service.config().warnDurationSeconds() : parseDuration(args[1], sender);
+        if (durationSeconds < 0) {
+            return true;
         }
-        String reason = reasonStart.trim();
-        if (reason.isEmpty()) {
+        String reason = joinArgs(args, type == Type.WARN ? 1 : 2);
+        if (reason.isBlank()) {
             service.messageService().send(sender, messages.error("reason"));
             return true;
         }
+        boolean silent = hasFlag(args, "-s");
+        boolean nnr = hasFlag(args, "-nnr");
         UUID target = uuid.get();
-        service.getActiveByUuid(target).thenAccept(records -> {
-            boolean already = records.stream().anyMatch(record -> record.type().equalsIgnoreCase(type.typeName));
-            if (already) {
-                service.runSync(() -> service.messageService().send(sender, messages.alreadyPunished()));
-                return;
-            }
-            String issuedBy = sender.getName();
-            String ip = PlayerResolver.resolveIp(target).orElse(null);
-            service.issuePunishment(target, type.typeName, reason, durationSeconds, issuedBy, ip)
-                    .thenAccept(record -> {
-                        handlePostIssue(record, type);
-                        if (type == Type.WARN) {
-                            service.countActiveWarns(target).thenAccept(count -> {
-                                if (count >= 3 && ip != null) {
-                                    service.issuePunishment(target, "IPBAN", service.config().autoIpbanReason(), 0, "Автоматически", ip)
-                                            .thenAccept(autoRecord -> service.kickIfOnline(autoRecord.uuid(), autoRecord.reason(), autoRecord.durationSeconds(), autoRecord.id(), autoRecord.nnr()));
-                                }
-                            });
-                        }
-                    });
-        });
+        String actor = sender.getName();
+        String ip = PlayerResolver.resolveIp(target).orElse(null);
+        service.issuePunishment(target, type.typeName, reason.trim(), durationSeconds, actor, ip, silent, nnr)
+                .thenAccept(record -> {
+                    if (type == Type.WARN) {
+                        service.core().getActiveByUuid(target).thenAccept(active -> {
+                            long warnCount = active.all().stream().filter(p -> p.type() == PunishmentType.WARN).count();
+                            if (warnCount >= 3 && ip != null) {
+                                service.issuePunishment(target, PunishmentType.IPBAN.name(), service.config().autoIpbanReason(), 0L, "Система", ip, false, false);
+                            }
+                        });
+                    }
+                });
         return true;
     }
 
-    private void handlePostIssue(PunishmentRecord record, Type type) {
-        switch (type) {
-            case BAN, IPBAN, IDBAN -> service.kickIfOnline(record.uuid(), record.reason(), record.durationSeconds(), record.id(), record.nnr());
-            case MUTE -> service.sendMuteMessage(record.uuid(), record.reason(), record.durationSeconds(), record.id(), record.nnr());
-            case WARN -> service.sendWarnMessage(record.uuid(), record.reason(), record.durationSeconds(), record.id(), record.nnr());
-            default -> {
+    private long parseDuration(String input, CommandSender sender) {
+        try {
+            return DurationParser.parseToSeconds(input);
+        } catch (IllegalArgumentException exception) {
+            service.messageService().send(sender, messages.error("duration"));
+            return -1;
+        }
+    }
+
+    private boolean hasFlag(String[] args, String flag) {
+        for (String arg : args) {
+            if (arg.equalsIgnoreCase(flag)) {
+                return true;
             }
         }
+        return false;
     }
 
     private String joinArgs(String[] args, int start) {
         StringBuilder builder = new StringBuilder();
         for (int i = start; i < args.length; i++) {
-            if (i > start) {
+            String arg = args[i];
+            if (arg.equalsIgnoreCase("-s") || arg.equalsIgnoreCase("-nnr")) {
+                continue;
+            }
+            if (builder.length() > 0) {
                 builder.append(' ');
             }
-            builder.append(args[i]);
+            builder.append(arg);
         }
         return builder.toString();
     }
