@@ -3,6 +3,7 @@ package com.pluginbans.core;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -110,6 +111,38 @@ public final class PunishmentService implements AutoCloseable {
 
     public CompletableFuture<Optional<PunishmentRecord>> findByInternalId(String internalId) {
         return repository.findByInternalId(internalId);
+    }
+
+    public CompletableFuture<List<PunishmentRecord>> getActiveForConnection(UUID uuid, String ip) {
+        CompletableFuture<List<PunishmentRecord>> byUuidFuture;
+        if (uuid == null) {
+            byUuidFuture = CompletableFuture.completedFuture(List.of());
+        } else {
+            byUuidFuture = getActiveByUuid(uuid).thenApply(ActivePunishment::all);
+        }
+
+        CompletableFuture<List<PunishmentRecord>> byIpFuture;
+        if (ip == null || ip.isBlank()) {
+            byIpFuture = CompletableFuture.completedFuture(List.of());
+        } else {
+            byIpFuture = getActiveByIp(ip)
+                    .thenCombine(getActiveByIpHash(IpHashing.hash(ip)), (byIp, byHash) -> {
+                        List<PunishmentRecord> merged = new ArrayList<>(byIp);
+                        merged.addAll(byHash);
+                        return merged;
+                    });
+        }
+
+        return byUuidFuture.thenCombine(byIpFuture, (byUuid, byIp) -> {
+            Map<String, PunishmentRecord> unique = new LinkedHashMap<>();
+            for (PunishmentRecord record : byUuid) {
+                unique.put(record.internalId(), record);
+            }
+            for (PunishmentRecord record : byIp) {
+                unique.putIfAbsent(record.internalId(), record);
+            }
+            return List.copyOf(unique.values());
+        });
     }
 
     private void poll() {

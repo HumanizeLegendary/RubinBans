@@ -7,6 +7,7 @@ import com.pluginbans.core.PunishmentCreateEvent;
 import com.pluginbans.core.PunishmentIdGenerator;
 import com.pluginbans.core.PunishmentListener;
 import com.pluginbans.core.PunishmentRecord;
+import com.pluginbans.core.PunishmentRules;
 import com.pluginbans.core.PunishmentService;
 import com.pluginbans.core.PunishmentType;
 import org.bukkit.Bukkit;
@@ -19,6 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
 
 public final class PaperPunishmentService implements PunishmentListener {
     private final Plugin plugin;
@@ -102,6 +104,10 @@ public final class PaperPunishmentService implements PunishmentListener {
         Bukkit.getScheduler().runTask(plugin, runnable);
     }
 
+    public void logError(String message, Throwable throwable) {
+        plugin.getLogger().log(Level.SEVERE, message, throwable);
+    }
+
     @Override
     public void onCreate(PunishmentCreateEvent event) {
         PunishmentRecord record = event.record();
@@ -123,7 +129,7 @@ public final class PaperPunishmentService implements PunishmentListener {
             broadcast(record, messages.warnMessage());
             return;
         }
-        if (record.type() == PunishmentType.BAN || record.type() == PunishmentType.TEMPBAN || record.type() == PunishmentType.IPBAN) {
+        if (PunishmentRules.isBanLike(record.type())) {
             kickIfOnline(record);
             broadcast(record, messages.banMessage());
         }

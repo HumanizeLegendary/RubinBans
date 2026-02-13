@@ -1,8 +1,8 @@
 package com.pluginbans.paper;
 
 import com.pluginbans.core.DurationFormatter;
-import com.pluginbans.core.IpHashing;
 import com.pluginbans.core.PunishmentRecord;
+import com.pluginbans.core.PunishmentRules;
 import com.pluginbans.core.PunishmentType;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
 
 public final class PunishmentListener implements Listener {
@@ -38,16 +37,18 @@ public final class PunishmentListener implements Listener {
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
         String ip = event.getAddress() == null ? null : event.getAddress().getHostAddress();
         UUID uuid = event.getUniqueId();
-        List<PunishmentRecord> punishments = new java.util.ArrayList<>(service.core().getActiveByUuid(uuid).join().all());
-        if (ip != null && !ip.isBlank()) {
-            punishments.addAll(service.core().getActiveByIp(ip).join());
-            punishments.addAll(service.core().getActiveByIpHash(IpHashing.hash(ip)).join());
+        List<PunishmentRecord> punishments;
+        try {
+            punishments = service.core().getActiveForConnection(uuid, ip).join();
+        } catch (RuntimeException exception) {
+            service.logError("Не удалось проверить наказания перед входом: " + uuid, exception);
+            event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, service.messageService().formatRaw(
+                    "<red>Сервис наказаний временно недоступен. Попробуйте позже.</red>"
+            ));
+            return;
         }
         Optional<PunishmentRecord> ban = punishments.stream()
-                .filter(record -> record.type() == PunishmentType.BAN
-                        || record.type() == PunishmentType.TEMPBAN
-                        || record.type() == PunishmentType.IPBAN
-                        || record.type() == PunishmentType.WARN)
+                .filter(record -> PunishmentRules.blocksLogin(record.type()))
                 .findFirst();
         if (ban.isEmpty()) {
             return;
@@ -79,7 +80,15 @@ public final class PunishmentListener implements Listener {
             event.setCancelled(true);
             return;
         }
-        List<PunishmentRecord> punishments = service.core().getActiveByUuid(uuid).join().all();
+        List<PunishmentRecord> punishments;
+        try {
+            punishments = service.core().getActiveByUuid(uuid).join().all();
+        } catch (RuntimeException exception) {
+            service.logError("Не удалось проверить мут для " + uuid, exception);
+            event.setCancelled(true);
+            event.getPlayer().sendMessage(service.messageService().format("<red>Сервис наказаний временно недоступен.</red>"));
+            return;
+        }
         Optional<PunishmentRecord> mute = punishments.stream()
                 .filter(record -> record.type() == PunishmentType.MUTE)
                 .findFirst();
@@ -111,27 +120,9 @@ public final class PunishmentListener implements Listener {
         UUID uuid = event.getPlayer().getUniqueId();
         String ip = event.getPlayer().getAddress() == null ? null : event.getPlayer().getAddress().getAddress().getHostAddress();
         service.core().track(uuid, ip);
-        CompletableFuture<List<PunishmentRecord>> byIpFuture;
-        if (ip == null || ip.isBlank()) {
-            byIpFuture = CompletableFuture.completedFuture(List.of());
-        } else {
-            byIpFuture = service.core().getActiveByIp(ip)
-                    .thenCombine(service.core().getActiveByIpHash(IpHashing.hash(ip)), (byIp, byHash) -> {
-                        List<PunishmentRecord> merged = new java.util.ArrayList<>(byIp);
-                        merged.addAll(byHash);
-                        return merged;
-                    });
-        }
-        service.core().getActiveByUuid(uuid).thenCombine(byIpFuture, (activeByUuid, activeByIp) -> {
-            List<PunishmentRecord> merged = new java.util.ArrayList<>(activeByUuid.all());
-            merged.addAll(activeByIp);
-            return merged;
-        }).thenAccept(punishments -> {
+        service.core().getActiveForConnection(uuid, ip).thenAccept(punishments -> {
             Optional<PunishmentRecord> ban = punishments.stream()
-                    .filter(record -> record.type() == PunishmentType.BAN
-                            || record.type() == PunishmentType.TEMPBAN
-                            || record.type() == PunishmentType.IPBAN
-                            || record.type() == PunishmentType.WARN)
+                    .filter(record -> PunishmentRules.blocksLogin(record.type()))
                     .findFirst();
             if (ban.isPresent()) {
                 PunishmentRecord record = ban.get();
@@ -155,6 +146,9 @@ public final class PunishmentListener implements Listener {
                     .filter(record -> record.type() == PunishmentType.CHECK)
                     .findFirst();
             check.ifPresent(record -> checkManager.startCheck(uuid, record.endTime()));
+        }).exceptionally(exception -> {
+            service.logError("Не удалось обработать активные наказания после входа: " + uuid, exception);
+            return null;
         });
     }
 
@@ -163,7 +157,16 @@ public final class PunishmentListener implements Listener {
         if (!service.config().muteBlockCommands()) {
             return;
         }
-        List<PunishmentRecord> punishments = service.core().getActiveByUuid(event.getPlayer().getUniqueId()).join().all();
+        UUID uuid = event.getPlayer().getUniqueId();
+        List<PunishmentRecord> punishments;
+        try {
+            punishments = service.core().getActiveByUuid(uuid).join().all();
+        } catch (RuntimeException exception) {
+            service.logError("Не удалось проверить мут при выполнении команды: " + uuid, exception);
+            event.setCancelled(true);
+            event.getPlayer().sendMessage(service.messageService().format("<red>Сервис наказаний временно недоступен.</red>"));
+            return;
+        }
         Optional<PunishmentRecord> mute = punishments.stream().filter(record -> record.type() == PunishmentType.MUTE).findFirst();
         if (mute.isPresent()) {
             event.setCancelled(true);

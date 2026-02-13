@@ -68,10 +68,17 @@ public final class CustomPunishCommand implements CommandExecutor {
             return true;
         }
         service.issuePunishment(target, type.name(), reason.trim(), durationSeconds, actor, ip, silent, nnr)
-                .thenAccept(record -> service.runSync(() -> service.messageService().send(
-                        sender,
-                        "<gray>ID наказания:</gray> <white>" + record.internalId() + "</white>"
-                )));
+                .whenComplete((record, throwable) -> {
+                    if (throwable != null) {
+                        service.logError("Не удалось выдать наказание " + type.name() + " для " + target, throwable);
+                        service.runSync(() -> service.messageService().send(sender, "<red>Не удалось выдать наказание.</red>"));
+                        return;
+                    }
+                    service.runSync(() -> service.messageService().send(
+                            sender,
+                            "<gray>ID наказания:</gray> <white>" + record.internalId() + "</white>"
+                    ));
+                });
         return true;
     }
 

@@ -8,6 +8,8 @@ import com.pluginbans.core.JdbcPunishmentRepository;
 import com.pluginbans.core.PunishmentRepository;
 import com.pluginbans.core.PunishmentService;
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -50,13 +52,13 @@ public final class PluginBansPaper extends JavaPlugin {
     }
 
     private void registerCommands() {
-        getCommand("ban").setExecutor(new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.BAN));
-        getCommand("tempban").setExecutor(new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.TEMPBAN));
-        getCommand("ipban").setExecutor(new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.IPBAN));
-        getCommand("mute").setExecutor(new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.MUTE));
-        getCommand("warn").setExecutor(new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.WARN));
-        getCommand("punish").setExecutor(new CustomPunishCommand(punishmentService, messages));
-        getCommand("checkpunish").setExecutor(new CheckPunishCommand(punishmentService, messages));
+        registerCommandExecutor("ban", new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.BAN));
+        registerCommandExecutor("tempban", new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.TEMPBAN));
+        registerCommandExecutor("ipban", new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.IPBAN));
+        registerCommandExecutor("mute", new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.MUTE));
+        registerCommandExecutor("warn", new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.WARN));
+        registerCommandExecutor("punish", new CustomPunishCommand(punishmentService, messages));
+        registerCommandExecutor("checkpunish", new CheckPunishCommand(punishmentService, messages));
     }
 
     private void registerListeners() {
@@ -96,5 +98,14 @@ public final class PluginBansPaper extends JavaPlugin {
 
     private Path auditPath() {
         return getDataFolder().toPath().resolve("audit.log");
+    }
+
+    private void registerCommandExecutor(String commandName, CommandExecutor executor) {
+        PluginCommand command = getCommand(commandName);
+        if (command == null) {
+            getLogger().severe("Команда не найдена в plugin.yml: " + commandName);
+            return;
+        }
+        command.setExecutor(executor);
     }
 }

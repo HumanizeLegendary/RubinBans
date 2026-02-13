@@ -1,6 +1,7 @@
 package com.pluginbans.paper;
 
 import com.pluginbans.core.DurationParser;
+import com.pluginbans.core.PunishmentRules;
 import com.pluginbans.core.PunishmentType;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -75,18 +76,30 @@ public final class StandardPunishCommand implements CommandExecutor {
             return true;
         }
         service.issuePunishment(target, type.typeName, reason.trim(), durationSeconds, actor, ip, silent, nnr)
-                .thenAccept(record -> {
+                .whenComplete((record, throwable) -> {
+                    if (throwable != null) {
+                        service.logError("Не удалось выдать наказание " + type.typeName + " для " + target, throwable);
+                        service.runSync(() -> service.messageService().send(sender, "<red>Не удалось выдать наказание.</red>"));
+                        return;
+                    }
                     service.runSync(() -> service.messageService().send(
                             sender,
                             "<gray>ID наказания:</gray> <white>" + record.internalId() + "</white>"
                     ));
                     if (type == Type.WARN) {
-                        service.core().getActiveByUuid(target).thenAccept(active -> {
+                        service.core().getActiveByUuid(target).whenComplete((active, warnThrowable) -> {
+                            if (warnThrowable != null) {
+                                service.logError("Не удалось проверить лимит предупреждений для " + target, warnThrowable);
+                                return;
+                            }
                             long warnCount = active.all().stream().filter(p -> p.type() == PunishmentType.WARN).count();
-                            boolean hasActiveBan = active.all().stream().anyMatch(p ->
-                                    p.type() == PunishmentType.BAN || p.type() == PunishmentType.TEMPBAN || p.type() == PunishmentType.IPBAN);
+                            boolean hasActiveBan = active.all().stream().anyMatch(p -> PunishmentRules.isBanLike(p.type()));
                             if (warnCount >= 3 && !hasActiveBan) {
-                                service.issuePunishment(target, PunishmentType.BAN.name(), service.config().autoBanReason(), 0L, "Система", ip, false, false);
+                                service.issuePunishment(target, PunishmentType.BAN.name(), service.config().autoBanReason(), 0L, "Система", ip, false, false)
+                                        .exceptionally(autoBanThrowable -> {
+                                            service.logError("Не удалось выдать авто-бан после 3 предупреждений для " + target, autoBanThrowable);
+                                            return null;
+                                        });
                             }
                         });
                     }

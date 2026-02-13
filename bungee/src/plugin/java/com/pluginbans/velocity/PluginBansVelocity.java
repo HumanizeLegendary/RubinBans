@@ -3,11 +3,11 @@ package com.pluginbans.velocity;
 import com.google.inject.Inject;
 import com.pluginbans.core.AuditLogger;
 import com.pluginbans.core.DatabaseManager;
-import com.pluginbans.core.IpHashing;
 import com.pluginbans.core.JdbcPunishmentRepository;
 import com.pluginbans.core.PunishmentCreateEvent;
 import com.pluginbans.core.PunishmentListener;
 import com.pluginbans.core.PunishmentRecord;
+import com.pluginbans.core.PunishmentRules;
 import com.pluginbans.core.PunishmentService;
 import com.pluginbans.core.PunishmentType;
 import com.velocitypowered.api.event.PostOrder;
@@ -24,7 +24,6 @@ import net.kyori.adventure.text.Component;
 
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -62,14 +61,16 @@ public final class PluginBansVelocity implements PunishmentListener {
             return;
         }
         UUID uuid = event.getUniqueId();
-        List<PunishmentRecord> punishments = new java.util.ArrayList<>(punishmentService.getActiveByUuid(uuid).join().all());
-        punishments.addAll(punishmentService.getActiveByIp(ip).join());
-        punishments.addAll(punishmentService.getActiveByIpHash(IpHashing.hash(ip)).join());
+        java.util.List<PunishmentRecord> punishments;
+        try {
+            punishments = punishmentService.getActiveForConnection(uuid, ip).join();
+        } catch (RuntimeException exception) {
+            auditLogger.log("Ошибка проверки наказаний перед входом: " + uuid);
+            event.setResult(PreLoginEvent.PreLoginComponentResult.denied(Component.text("Сервис наказаний временно недоступен.")));
+            return;
+        }
         Optional<PunishmentRecord> ban = punishments.stream()
-                .filter(record -> record.type() == PunishmentType.BAN
-                        || record.type() == PunishmentType.TEMPBAN
-                        || record.type() == PunishmentType.IPBAN
-                        || record.type() == PunishmentType.WARN)
+                .filter(record -> PunishmentRules.blocksLogin(record.type()))
                 .findFirst();
         if (ban.isPresent()) {
             auditLogger.log("Теневой вход: %s заблокирован (тип %s)".formatted(uuid, ban.get().type().name()));
@@ -112,10 +113,7 @@ public final class PluginBansVelocity implements PunishmentListener {
     @Override
     public void onCreate(PunishmentCreateEvent event) {
         PunishmentRecord record = event.record();
-        if (record.type() != PunishmentType.BAN
-                && record.type() != PunishmentType.TEMPBAN
-                && record.type() != PunishmentType.IPBAN
-                && record.type() != PunishmentType.WARN) {
+        if (!PunishmentRules.blocksLogin(record.type())) {
             return;
         }
         proxy.getPlayer(record.uuid()).ifPresent(player ->
