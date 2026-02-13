@@ -67,7 +67,11 @@ public final class CustomPunishCommand implements CommandExecutor {
             service.messageService().send(sender, "<red>Для IP-бана игрок должен быть онлайн.</red>");
             return true;
         }
-        service.issuePunishment(target, type.name(), reason.trim(), durationSeconds, actor, ip, silent, nnr);
+        service.issuePunishment(target, type.name(), reason.trim(), durationSeconds, actor, ip, silent, nnr)
+                .thenAccept(record -> service.runSync(() -> service.messageService().send(
+                        sender,
+                        "<gray>ID наказания:</gray> <white>" + record.internalId() + "</white>"
+                )));
         return true;
     }
 

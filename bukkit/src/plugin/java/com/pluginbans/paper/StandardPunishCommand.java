@@ -44,7 +44,7 @@ public final class StandardPunishCommand implements CommandExecutor {
             return true;
         }
         if (args.length < 2) {
-            service.messageService().send(sender, messages.error("usage"));
+            sendUsage(sender, command);
             return true;
         }
         Optional<UUID> uuid = PlayerResolver.resolveUuid(args[0]);
@@ -76,6 +76,10 @@ public final class StandardPunishCommand implements CommandExecutor {
         }
         service.issuePunishment(target, type.typeName, reason.trim(), durationSeconds, actor, ip, silent, nnr)
                 .thenAccept(record -> {
+                    service.runSync(() -> service.messageService().send(
+                            sender,
+                            "<gray>ID наказания:</gray> <white>" + record.internalId() + "</white>"
+                    ));
                     if (type == Type.WARN) {
                         service.core().getActiveByUuid(target).thenAccept(active -> {
                             long warnCount = active.all().stream().filter(p -> p.type() == PunishmentType.WARN).count();
@@ -88,6 +92,15 @@ public final class StandardPunishCommand implements CommandExecutor {
                     }
                 });
         return true;
+    }
+
+    private void sendUsage(CommandSender sender, Command command) {
+        String usage = command.getUsage();
+        if (usage == null || usage.isBlank()) {
+            service.messageService().send(sender, messages.error("usage"));
+            return;
+        }
+        service.messageService().send(sender, "<red>Использование:</red> <white>" + usage + "</white>");
     }
 
     private long parseDuration(String input, CommandSender sender) {

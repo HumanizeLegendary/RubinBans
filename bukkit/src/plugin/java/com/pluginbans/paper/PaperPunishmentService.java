@@ -134,12 +134,14 @@ public final class PaperPunishmentService implements PunishmentListener {
         }
         String playerName = java.util.Optional.ofNullable(org.bukkit.Bukkit.getOfflinePlayer(record.uuid()).getName()).orElse(record.uuid().toString());
         String time = DurationFormatter.formatSeconds(record.durationSeconds());
-        String message = messageService.applyPlaceholders(template, Map.of(
+        String rendered = messageService.applyPlaceholders(template, Map.of(
                 "%player%", playerName,
                 "%reason%", record.reason(),
                 "%time%", time,
-                "%actor%", record.actor()
+                "%actor%", record.actor(),
+                "%id%", record.internalId()
         ));
+        String message = ensureIdInMessage(template, rendered, record.internalId());
         runSync(() -> Bukkit.getOnlinePlayers().stream()
                 .filter(this::canReceiveNotifications)
                 .forEach(player -> player.sendMessage(messageService.format(message))));
@@ -152,12 +154,14 @@ public final class PaperPunishmentService implements PunishmentListener {
         }
         String playerName = player.getName();
         String time = DurationFormatter.formatSeconds(record.durationSeconds());
-        String message = messageService.applyPlaceholders(template, Map.of(
+        String rendered = messageService.applyPlaceholders(template, Map.of(
                 "%player%", playerName,
                 "%reason%", record.reason(),
                 "%time%", time,
-                "%actor%", record.actor()
+                "%actor%", record.actor(),
+                "%id%", record.internalId()
         ));
+        String message = ensureIdInMessage(template, rendered, record.internalId());
         runSync(() -> player.sendMessage(messageService.format(message)));
     }
 
@@ -167,13 +171,21 @@ public final class PaperPunishmentService implements PunishmentListener {
             return;
         }
         String time = DurationFormatter.formatSeconds(record.durationSeconds());
-        String message = messageService.applyPlaceholders(messages.kickMessage(), Map.of(
+        String rendered = messageService.applyPlaceholders(messages.kickMessage(), Map.of(
                 "%reason%", record.reason(),
                 "%time%", time,
                 "%actor%", record.actor(),
                 "%id%", record.internalId()
         ));
+        String message = ensureIdInMessage(messages.kickMessage(), rendered, record.internalId());
         runSync(() -> player.kick(messageService.formatRaw(message)));
+    }
+
+    private String ensureIdInMessage(String template, String rendered, String id) {
+        if (template != null && template.contains("%id%")) {
+            return rendered;
+        }
+        return rendered + "\n<gray>ID наказания:</gray> <white>" + id + "</white>";
     }
 
     private boolean canReceiveNotifications(Player player) {

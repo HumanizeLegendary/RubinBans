@@ -1,9 +1,9 @@
 prefix: "<red>БАНЫ | </red>"
 
-ban: "<red>%player%</red> был забанен. <gray>Причина:</gray> <white>%reason%</white> <gray>Длительность:</gray> <white>%time%</white> <gray>Выдал:</gray> <white>%actor%</white>"
-mute: "<yellow>%player%</yellow> получил мут. <gray>Причина:</gray> <white>%reason%</white> <gray>Длительность:</gray> <white>%time%</white> <gray>Выдал:</gray> <white>%actor%</white>"
-warn: "<gold>%player%</gold> получил варн (блокировка 14 дней). <gray>Причина:</gray> <white>%reason%</white> <gray>Выдал:</gray> <white>%actor%</white>"
-check: "<aqua>%player%</aqua> отправлен на проверку. <gray>Выдал:</gray> <white>%actor%</white>"
+ban: "<red>%player%</red> был забанен. <gray>Причина:</gray> <white>%reason%</white> <gray>Длительность:</gray> <white>%time%</white> <gray>Выдал:</gray> <white>%actor%</white> <gray>ID:</gray> <white>%id%</white>"
+mute: "<yellow>%player%</yellow> получил мут. <gray>Причина:</gray> <white>%reason%</white> <gray>Длительность:</gray> <white>%time%</white> <gray>Выдал:</gray> <white>%actor%</white> <gray>ID:</gray> <white>%id%</white>"
+warn: "<gold>%player%</gold> получил варн (блокировка 14 дней). <gray>Причина:</gray> <white>%reason%</white> <gray>Выдал:</gray> <white>%actor%</white> <gray>ID:</gray> <white>%id%</white>"
+check: "<aqua>%player%</aqua> отправлен на проверку. <gray>Выдал:</gray> <white>%actor%</white> <gray>ID:</gray> <white>%id%</white>"
 
 kick: |-
   <red>Вы заблокированы.</red>

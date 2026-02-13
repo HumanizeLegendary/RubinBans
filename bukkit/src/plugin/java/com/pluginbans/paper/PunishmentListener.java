@@ -54,12 +54,13 @@ public final class PunishmentListener implements Listener {
         }
         PunishmentRecord record = ban.get();
         String time = DurationFormatter.formatSeconds(record.durationSeconds());
-        String message = service.messageService().applyPlaceholders(messages.kickMessage(), Map.of(
+        String rendered = service.messageService().applyPlaceholders(messages.kickMessage(), Map.of(
                 "%reason%", record.reason(),
                 "%time%", time,
                 "%actor%", record.actor(),
                 "%id%", record.internalId()
         ));
+        String message = withIdIfMissing(messages.kickMessage(), rendered, record.internalId());
         Component component = service.messageService().formatRaw(message);
         event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED, component);
     }
@@ -138,12 +139,13 @@ public final class PunishmentListener implements Listener {
             if (ban.isPresent()) {
                 PunishmentRecord record = ban.get();
                 String time = DurationFormatter.formatSeconds(record.durationSeconds());
-                String message = service.messageService().applyPlaceholders(messages.kickMessage(), Map.of(
+                String rendered = service.messageService().applyPlaceholders(messages.kickMessage(), Map.of(
                         "%reason%", record.reason(),
                         "%time%", time,
                         "%actor%", record.actor(),
                         "%id%", record.internalId()
                 ));
+                String message = withIdIfMissing(messages.kickMessage(), rendered, record.internalId());
                 service.runSync(() -> {
                     org.bukkit.entity.Player online = org.bukkit.Bukkit.getPlayer(uuid);
                     if (online != null && online.isOnline()) {
@@ -190,5 +192,12 @@ public final class PunishmentListener implements Listener {
         org.bukkit.Bukkit.getOnlinePlayers().stream()
                 .filter(player -> player.hasPermission("bans.check") || player.hasPermission("bans.fullaccess"))
                 .forEach(player -> player.sendMessage(service.messageService().format(message)));
+    }
+
+    private String withIdIfMissing(String template, String rendered, String id) {
+        if (template != null && template.contains("%id%")) {
+            return rendered;
+        }
+        return rendered + "\n<gray>ID наказания:</gray> <white>" + id + "</white>";
     }
 }
