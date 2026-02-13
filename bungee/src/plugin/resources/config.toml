@@ -1,0 +1,16 @@
+[pluginbans]
+lobby-servers = ["lobby", "hub"]
+
+[database]
+type = "SQLITE"
+host = "localhost"
+port = 3306
+database = "pluginbans"
+user = "root"
+password = ""
+pool-size = 10
+sqlite-file = "pluginbans-velocity.db"
+
+[throttle]
+max-connections = 5
+window-seconds = 10

@@ -1,90 +1,88 @@
 package com.pluginbans.paper;
 
-import com.pluginbans.core.DiscordBridge;
+import com.pluginbans.core.AuditLogger;
 import com.pluginbans.core.DurationFormatter;
+import com.pluginbans.core.IpHashing;
+import com.pluginbans.core.PunishmentCreateEvent;
 import com.pluginbans.core.PunishmentIdGenerator;
+import com.pluginbans.core.PunishmentListener;
 import com.pluginbans.core.PunishmentRecord;
-import com.pluginbans.core.PunishmentRepository;
+import com.pluginbans.core.PunishmentService;
+import com.pluginbans.core.PunishmentType;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-public final class PaperPunishmentService {
+public final class PaperPunishmentService implements PunishmentListener {
     private final Plugin plugin;
-    private final PunishmentRepository repository;
+    private final PunishmentService punishmentService;
     private final PaperConfig config;
     private final MessagesConfig messages;
-    private final DiscordBridge discordBridge;
-    private final VelocityMessenger velocityMessenger;
     private final MessageService messageService;
+    private final AuditLogger auditLogger;
+    private CheckManager checkManager;
 
     public PaperPunishmentService(
             Plugin plugin,
-            PunishmentRepository repository,
+            PunishmentService punishmentService,
             PaperConfig config,
             MessagesConfig messages,
-            DiscordBridge discordBridge,
-            VelocityMessenger velocityMessenger
+            AuditLogger auditLogger,
+            CheckManager checkManager
     ) {
         this.plugin = plugin;
-        this.repository = repository;
+        this.punishmentService = punishmentService;
         this.config = config;
         this.messages = messages;
-        this.discordBridge = discordBridge;
-        this.velocityMessenger = velocityMessenger;
         this.messageService = new MessageService(messages);
+        this.auditLogger = auditLogger;
+        this.checkManager = checkManager;
     }
 
-    public CompletableFuture<PunishmentRecord> issuePunishment(UUID uuid, String type, String reason, long durationSeconds, String issuedBy, String ip) {
-        boolean nnr = config.nnrTypes().contains(type.toUpperCase(Locale.ROOT));
-        String typeCode = nnr ? "NNR" : (durationSeconds > 0 ? "TM" : "NV");
-        String id = PunishmentIdGenerator.generate(typeCode);
+    public void setCheckManager(CheckManager checkManager) {
+        this.checkManager = checkManager;
+    }
+
+    public CompletableFuture<PunishmentRecord> issuePunishment(UUID uuid, String typeName, String reason, long durationSeconds, String actor, String ip, boolean silent, boolean nnr) {
+        PunishmentType type = PunishmentType.valueOf(typeName.toUpperCase(Locale.ROOT));
+        if (type == PunishmentType.BAN && durationSeconds > 0) {
+            type = PunishmentType.TEMPBAN;
+        }
+        Instant start = Instant.now();
+        Instant end = durationSeconds > 0 ? start.plusSeconds(durationSeconds) : null;
+        String idCode = nnr ? "NNR" : (end == null ? "NV" : "TM");
         PunishmentRecord record = new PunishmentRecord(
-                id,
                 uuid,
-                type.toUpperCase(Locale.ROOT),
-                reason,
-                durationSeconds,
-                issuedBy,
-                Instant.now(),
                 ip,
+                IpHashing.hash(ip),
+                type,
+                reason,
+                actor,
+                start,
+                end,
                 true,
-                nnr
+                PunishmentIdGenerator.generate(idCode),
+                silent
         );
-        return repository.addPunishment(record)
-                .thenApply(ignored -> record)
-                .thenApply(saved -> {
-                    discordBridge.buildPayload(saved);
-                    velocityMessenger.sendPunishment(saved);
-                    return saved;
-                });
+        auditLogger.log("Наказание: %s -> %s (%s), причина: %s, длительность: %s, скрыто: %s".formatted(
+                actor,
+                uuid,
+                type.name(),
+                reason,
+                DurationFormatter.formatSeconds(durationSeconds),
+                silent ? "да" : "нет"
+        ));
+        return punishmentService.createPunishment(record);
     }
 
-    public CompletableFuture<List<PunishmentRecord>> getActiveByUuid(UUID uuid) {
-        return repository.findActiveByUuid(uuid).thenCompose(this::filterExpired);
-    }
-
-    public CompletableFuture<List<PunishmentRecord>> getActiveByIp(String ip) {
-        return repository.findActiveByIp(ip).thenCompose(this::filterExpired);
-    }
-
-    public CompletableFuture<Optional<PunishmentRecord>> findById(String id) {
-        return repository.findById(id);
-    }
-
-    public CompletableFuture<Long> countActiveWarns(UUID uuid) {
-        return getActiveByUuid(uuid).thenApply(records -> records.stream()
-                .filter(record -> record.type().equalsIgnoreCase("WARN"))
-                .count());
+    public PunishmentService core() {
+        return punishmentService;
     }
 
     public PaperConfig config() {
@@ -103,82 +101,75 @@ public final class PaperPunishmentService {
         Bukkit.getScheduler().runTask(plugin, runnable);
     }
 
-    public void kickIfOnline(UUID uuid, String reason, long durationSeconds, String id, boolean nnr) {
-        Player player = Bukkit.getPlayer(uuid);
+    @Override
+    public void onCreate(PunishmentCreateEvent event) {
+        PunishmentRecord record = event.record();
+        if (checkManager == null) {
+            return;
+        }
+        if (record.type() == PunishmentType.CHECK) {
+            checkManager.startCheck(record.uuid(), record.endTime());
+            broadcast(record, messages.checkMessage());
+            return;
+        }
+        if (record.type() == PunishmentType.MUTE) {
+            sendPunished(record, messages.muteMessage());
+            broadcast(record, messages.muteMessage());
+            return;
+        }
+        if (record.type() == PunishmentType.WARN) {
+            sendPunished(record, messages.warnMessage());
+            broadcast(record, messages.warnMessage());
+            return;
+        }
+        if (record.type() == PunishmentType.BAN || record.type() == PunishmentType.TEMPBAN || record.type() == PunishmentType.IPBAN) {
+            kickIfOnline(record);
+            broadcast(record, messages.banMessage());
+        }
+    }
+
+    private void broadcast(PunishmentRecord record, String template) {
+        if (record.silent()) {
+            return;
+        }
+        String playerName = java.util.Optional.ofNullable(org.bukkit.Bukkit.getOfflinePlayer(record.uuid()).getName()).orElse(record.uuid().toString());
+        String time = DurationFormatter.formatSeconds(record.durationSeconds());
+        String message = messageService.applyPlaceholders(template, Map.of(
+                "%player%", playerName,
+                "%reason%", record.reason(),
+                "%time%", time,
+                "%actor%", record.actor()
+        ));
+        runSync(() -> Bukkit.broadcast(messageService.format(message), "bans.fullaccess"));
+    }
+
+    private void sendPunished(PunishmentRecord record, String template) {
+        Player player = Bukkit.getPlayer(record.uuid());
         if (player == null) {
             return;
         }
-        String finalReason = nnr ? config.nnrHiddenReason() : reason;
-        String message = messageService.applyPlaceholders(messages.banScreen(), Map.of(
-                "%reason%", finalReason,
-                "%time%", DurationFormatter.formatSeconds(durationSeconds),
-                "%id%", id
+        String playerName = player.getName();
+        String time = DurationFormatter.formatSeconds(record.durationSeconds());
+        String message = messageService.applyPlaceholders(template, Map.of(
+                "%player%", playerName,
+                "%reason%", record.reason(),
+                "%time%", time,
+                "%actor%", record.actor()
+        ));
+        runSync(() -> player.sendMessage(messageService.format(message)));
+    }
+
+    private void kickIfOnline(PunishmentRecord record) {
+        Player player = Bukkit.getPlayer(record.uuid());
+        if (player == null) {
+            return;
+        }
+        String time = DurationFormatter.formatSeconds(record.durationSeconds());
+        String message = messageService.applyPlaceholders(messages.kickMessage(), Map.of(
+                "%reason%", record.reason(),
+                "%time%", time,
+                "%actor%", record.actor()
         ));
         runSync(() -> player.kick(messageService.format(message)));
-    }
-
-    public void sendMuteMessage(UUID uuid, String reason, long durationSeconds, String id, boolean nnr) {
-        Player player = Bukkit.getPlayer(uuid);
-        if (player == null) {
-            return;
-        }
-        String finalReason = nnr ? config.nnrHiddenReason() : reason;
-        String message = messageService.applyPlaceholders(messages.muteMessage(), Map.of(
-                "%reason%", finalReason,
-                "%time%", DurationFormatter.formatSeconds(durationSeconds),
-                "%id%", id
-        ));
-        runSync(() -> player.sendMessage(messageService.format(message)));
-    }
-
-    public void sendWarnMessage(UUID uuid, String reason, long durationSeconds, String id, boolean nnr) {
-        Player player = Bukkit.getPlayer(uuid);
-        if (player == null) {
-            return;
-        }
-        String finalReason = nnr ? config.nnrHiddenReason() : reason;
-        String message = messageService.applyPlaceholders(messages.warnMessage(), Map.of(
-                "%reason%", finalReason,
-                "%time%", DurationFormatter.formatSeconds(durationSeconds),
-                "%id%", id
-        ));
-        runSync(() -> player.sendMessage(messageService.format(message)));
-    }
-
-    public CompletableFuture<List<PunishmentRecord>> getActiveBanLike(UUID uuid, String ip) {
-        CompletableFuture<List<PunishmentRecord>> byUuid = getActiveByUuid(uuid);
-        CompletableFuture<List<PunishmentRecord>> byIp = ip == null ? CompletableFuture.completedFuture(List.of()) : getActiveByIp(ip);
-        return byUuid.thenCombine(byIp, (uuidList, ipList) -> {
-            List<PunishmentRecord> combined = new ArrayList<>(uuidList);
-            combined.addAll(ipList);
-            return combined.stream()
-                    .filter(record -> switch (record.type()) {
-                        case "BAN", "IPBAN", "IDBAN" -> true;
-                        default -> false;
-                    })
-                    .toList();
-        });
-    }
-
-    private CompletableFuture<List<PunishmentRecord>> filterExpired(List<PunishmentRecord> records) {
-        Instant now = Instant.now();
-        List<CompletableFuture<Void>> updates = new ArrayList<>();
-        List<PunishmentRecord> active = new ArrayList<>();
-        for (PunishmentRecord record : records) {
-            if (record.isPermanent()) {
-                active.add(record);
-                continue;
-            }
-            if (record.expiresAt().isAfter(now)) {
-                active.add(record);
-            } else {
-                updates.add(repository.deactivate(record.id()));
-            }
-        }
-        if (updates.isEmpty()) {
-            return CompletableFuture.completedFuture(active);
-        }
-        return CompletableFuture.allOf(updates.toArray(new CompletableFuture[0]))
-                .thenApply(ignored -> active);
     }
 }

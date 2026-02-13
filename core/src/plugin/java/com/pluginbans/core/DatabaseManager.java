@@ -40,22 +40,40 @@ public final class DatabaseManager implements AutoCloseable {
     }
 
     private void initializeSchema() {
-        String createTable = """
+        String createPunishments = """
                 CREATE TABLE IF NOT EXISTS pluginbans_punishments (
-                    id VARCHAR(32) PRIMARY KEY,
+                    internal_id VARCHAR(64) PRIMARY KEY,
                     uuid VARCHAR(36) NOT NULL,
+                    ip VARCHAR(45),
+                    ip_hash VARCHAR(128),
                     type VARCHAR(32) NOT NULL,
                     reason TEXT NOT NULL,
-                    duration_seconds BIGINT NOT NULL,
-                    issued_by VARCHAR(64) NOT NULL,
-                    issued_at BIGINT NOT NULL,
-                    ip VARCHAR(45),
+                    actor VARCHAR(64) NOT NULL,
+                    start_time BIGINT NOT NULL,
+                    end_time BIGINT,
                     active BOOLEAN NOT NULL,
-                    nnr BOOLEAN NOT NULL
+                    silent BOOLEAN NOT NULL
+                )
+                """;
+        String createHistory = """
+                CREATE TABLE IF NOT EXISTS pluginbans_punishment_history (
+                    id VARCHAR(96) PRIMARY KEY,
+                    uuid VARCHAR(36) NOT NULL,
+                    ip VARCHAR(45),
+                    ip_hash VARCHAR(128),
+                    type VARCHAR(32) NOT NULL,
+                    reason TEXT NOT NULL,
+                    actor VARCHAR(64) NOT NULL,
+                    start_time BIGINT NOT NULL,
+                    end_time BIGINT,
+                    internal_id VARCHAR(64) NOT NULL,
+                    action VARCHAR(32) NOT NULL,
+                    action_time BIGINT NOT NULL
                 )
                 """;
         try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
-            statement.execute(createTable);
+            statement.execute(createPunishments);
+            statement.execute(createHistory);
         } catch (SQLException exception) {
             throw new IllegalStateException("Не удалось инициализировать базу данных.", exception);
         }

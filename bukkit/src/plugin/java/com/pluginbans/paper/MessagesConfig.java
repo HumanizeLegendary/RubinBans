@@ -8,22 +8,26 @@ import java.util.Map;
 
 public record MessagesConfig(
         String prefix,
-        String banScreen,
+        String banMessage,
         String muteMessage,
         String warnMessage,
+        String checkMessage,
+        String kickMessage,
+        String checkBlockMessage,
+        String mutedChatMessage,
         String permissionDenied,
-        String alreadyPunished,
-        String joinDenied,
         Map<String, String> errors
 ) {
     public static MessagesConfig from(FileConfiguration configuration) {
         String prefix = configuration.getString("prefix", "<red>[PluginBans]</red> ");
-        String banScreen = configuration.getString("ban_screen", "");
-        String muteMessage = configuration.getString("mute_message", "");
-        String warnMessage = configuration.getString("warn_message", "");
-        String permissionDenied = configuration.getString("permission_denied", "");
-        String alreadyPunished = configuration.getString("already_punished", "");
-        String joinDenied = configuration.getString("join_denied", "");
+        String ban = configuration.getString("ban", "");
+        String mute = configuration.getString("mute", "");
+        String warn = configuration.getString("warn", "");
+        String check = configuration.getString("check", "");
+        String kick = configuration.getString("kick", "");
+        String checkBlock = configuration.getString("check-block", "");
+        String mutedChat = configuration.getString("muted-chat", "");
+        String permissionDenied = configuration.getString("permission-denied", "<red>Недостаточно прав.</red>");
         Map<String, String> errors = new HashMap<>();
         ConfigurationSection section = configuration.getConfigurationSection("errors");
         if (section != null) {
@@ -31,7 +35,7 @@ public record MessagesConfig(
                 errors.put(key, section.getString(key, ""));
             }
         }
-        return new MessagesConfig(prefix, banScreen, muteMessage, warnMessage, permissionDenied, alreadyPunished, joinDenied, errors);
+        return new MessagesConfig(prefix, ban, mute, warn, check, kick, checkBlock, mutedChat, permissionDenied, errors);
     }
 
     public String error(String key) {

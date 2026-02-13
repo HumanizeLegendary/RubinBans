@@ -1,38 +1,23 @@
 prefix: "<gray>[<aqua>PluginBans</aqua>]</gray> "
 
-ban_screen: |-
+ban: "<red>%player%</red> был забанен. <gray>Причина:</gray> <white>%reason%</white> <gray>Длительность:</gray> <white>%time%</white> <gray>Выдал:</gray> <white>%actor%</white>"
+mute: "<yellow>%player%</yellow> получил мут. <gray>Причина:</gray> <white>%reason%</white> <gray>Длительность:</gray> <white>%time%</white> <gray>Выдал:</gray> <white>%actor%</white>"
+warn: "<gold>%player%</gold> получил предупреждение. <gray>Причина:</gray> <white>%reason%</white> <gray>Выдал:</gray> <white>%actor%</white>"
+check: "<aqua>%player%</aqua> отправлен на проверку. <gray>Выдал:</gray> <white>%actor%</white>"
+
+kick: |-
   <gray>---------------------</gray>
   <red>Вы были наказаны.</red>
 
   <gray>Причина:</gray> <white>%reason%</white>
   <gray>Длительность:</gray> <white>%time%</white>
-
-  <gray>ID:</gray> <white>%id%</white>
+  <gray>Выдал:</gray> <white>%actor%</white>
   <gray>---------------------</gray>
 
-mute_message: |-
-  <gray>---------------------</gray>
-  <red>Вы были наказаны.</red>
+check-block: "<red>Во время проверки чат заблокирован. Передайте AnyDesk код.</red>"
+muted-chat: "<red>Вы в муте.</red> <gray>Причина:</gray> <white>%reason%</white> <gray>Осталось:</gray> <white>%time%</white>"
 
-  <gray>Причина:</gray> <white>%reason%</white>
-  <gray>Длительность:</gray> <white>%time%</white>
-
-  <gray>ID:</gray> <white>%id%</white>
-  <gray>---------------------</gray>
-
-warn_message: |-
-  <gray>---------------------</gray>
-  <red>Вы были наказаны.</red>
-
-  <gray>Причина:</gray> <white>%reason%</white>
-  <gray>Длительность:</gray> <white>%time%</white>
-
-  <gray>ID:</gray> <white>%id%</white>
-  <gray>---------------------</gray>
-
-permission_denied: "<red>У вас нет прав на это действие.</red>"
-already_punished: "<red>Игрок уже наказан этим типом.</red>"
-join_denied: "<red>Доступ запрещен.</red>"
+permission-denied: "<red>У вас нет прав на это действие.</red>"
 
 errors:
   usage: "<red>Неверное использование команды.</red>"
@@ -40,4 +25,3 @@ errors:
   duration: "<red>Неверный формат длительности.</red>"
   reason: "<red>Укажите причину наказания.</red>"
   type: "<red>Недопустимый тип наказания.</red>"
-  none: "<yellow>Активные наказания не найдены.</yellow>"
