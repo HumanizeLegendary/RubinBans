@@ -99,7 +99,8 @@ public final class PluginBansVelocity implements PunishmentListener {
                 .findFirst()
                 .orElse(null);
         if (type != null) {
-            event.setResult(ServerPreConnectEvent.ServerResult.denied(Component.text("Вы на проверке")));
+            event.getPlayer().disconnect(Component.text("Вы на проверке"));
+            event.setResult(ServerPreConnectEvent.ServerResult.denied());
         }
     }
 
