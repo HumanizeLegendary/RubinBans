@@ -3,6 +3,7 @@ package com.pluginbans.velocity;
 import com.google.inject.Inject;
 import com.pluginbans.core.AuditLogger;
 import com.pluginbans.core.DatabaseManager;
+import com.pluginbans.core.DurationFormatter;
 import com.pluginbans.core.JdbcPunishmentRepository;
 import com.pluginbans.core.PunishmentCreateEvent;
 import com.pluginbans.core.PunishmentListener;
@@ -74,9 +75,7 @@ public final class PluginBansVelocity implements PunishmentListener {
                 .findFirst();
         if (ban.isPresent()) {
             auditLogger.log("Теневой вход: %s заблокирован (тип %s)".formatted(uuid, ban.get().type().name()));
-            event.setResult(PreLoginEvent.PreLoginComponentResult.denied(Component.text(
-                    "Вы заблокированы.\nID наказания: " + ban.get().internalId()
-            )));
+            event.setResult(PreLoginEvent.PreLoginComponentResult.denied(buildBlockMessage(ban.get())));
         }
     }
 
@@ -116,8 +115,7 @@ public final class PluginBansVelocity implements PunishmentListener {
         if (!PunishmentRules.blocksLogin(record.type())) {
             return;
         }
-        proxy.getPlayer(record.uuid()).ifPresent(player ->
-                player.disconnect(Component.text("Вы заблокированы.\nID наказания: " + record.internalId())));
+        proxy.getPlayer(record.uuid()).ifPresent(player -> player.disconnect(buildBlockMessage(record)));
     }
 
     @Subscribe
@@ -128,5 +126,19 @@ public final class PluginBansVelocity implements PunishmentListener {
         if (databaseManager != null) {
             databaseManager.close();
         }
+    }
+
+    private Component buildBlockMessage(PunishmentRecord record) {
+        String time = DurationFormatter.formatSeconds(record.durationSeconds());
+        String message = """
+                ------------------------------
+                Вы заблокированы.
+                Причина: %s
+                Длительность: %s
+                Выдал: %s
+                ID наказания: %s
+                ------------------------------
+                """.formatted(record.reason(), time, record.actor(), record.internalId());
+        return Component.text(message);
     }
 }

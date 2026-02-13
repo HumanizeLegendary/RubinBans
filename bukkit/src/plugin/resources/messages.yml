@@ -6,9 +6,13 @@ warn: "<gold>%player%</gold> получил варн (блокировка 14 д
 check: "<aqua>%player%</aqua> отправлен на проверку. <gray>Выдал:</gray> <white>%actor%</white> <gray>ID:</gray> <white>%id%</white>"
 
 kick: |-
+  <gray>------------------------------</gray>
   <red>Вы заблокированы.</red>
-
+  <gray>Причина:</gray> <white>%reason%</white>
+  <gray>Длительность:</gray> <white>%time%</white>
+  <gray>Выдал:</gray> <white>%actor%</white>
   <gray>ID наказания:</gray> <white>%id%</white>
+  <gray>------------------------------</gray>
 
 check-block: "<red>Во время проверки чат заблокирован. Передайте AnyDesk код.</red>"
 muted-chat: "<red>Вы в муте.</red> <gray>Причина:</gray> <white>%reason%</white> <gray>Осталось:</gray> <white>%time%</white>"

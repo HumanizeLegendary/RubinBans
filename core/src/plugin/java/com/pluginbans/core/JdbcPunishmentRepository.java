@@ -178,7 +178,7 @@ public final class JdbcPunishmentRepository implements PunishmentRepository {
     }
 
     private PunishmentRecord map(ResultSet resultSet) throws SQLException {
-        Long end = resultSet.getObject("end_time", Long.class);
+        Long end = readNullableEpochMillis(resultSet, "end_time");
         return new PunishmentRecord(
                 UUID.fromString(resultSet.getString("uuid")),
                 resultSet.getString("ip"),
@@ -186,7 +186,7 @@ public final class JdbcPunishmentRepository implements PunishmentRepository {
                 PunishmentType.valueOf(resultSet.getString("type")),
                 resultSet.getString("reason"),
                 resultSet.getString("actor"),
-                Instant.ofEpochMilli(resultSet.getLong("start_time")),
+                Instant.ofEpochMilli(readRequiredEpochMillis(resultSet, "start_time")),
                 end == null ? null : Instant.ofEpochMilli(end),
                 resultSet.getBoolean("active"),
                 resultSet.getString("internal_id"),
@@ -195,7 +195,7 @@ public final class JdbcPunishmentRepository implements PunishmentRepository {
     }
 
     private PunishmentHistoryRecord mapHistory(ResultSet resultSet) throws SQLException {
-        Long end = resultSet.getObject("end_time", Long.class);
+        Long end = readNullableEpochMillis(resultSet, "end_time");
         return new PunishmentHistoryRecord(
                 resultSet.getString("id"),
                 UUID.fromString(resultSet.getString("uuid")),
@@ -204,12 +204,47 @@ public final class JdbcPunishmentRepository implements PunishmentRepository {
                 PunishmentType.valueOf(resultSet.getString("type")),
                 resultSet.getString("reason"),
                 resultSet.getString("actor"),
-                Instant.ofEpochMilli(resultSet.getLong("start_time")),
+                Instant.ofEpochMilli(readRequiredEpochMillis(resultSet, "start_time")),
                 end == null ? null : Instant.ofEpochMilli(end),
                 resultSet.getString("internal_id"),
                 resultSet.getString("action"),
-                Instant.ofEpochMilli(resultSet.getLong("action_time"))
+                Instant.ofEpochMilli(readRequiredEpochMillis(resultSet, "action_time"))
         );
+    }
+
+    private long readRequiredEpochMillis(ResultSet resultSet, String column) throws SQLException {
+        Long value = readNullableEpochMillis(resultSet, column);
+        if (value == null) {
+            throw new SQLException("Пустое значение во временном поле: " + column);
+        }
+        return value;
+    }
+
+    private Long readNullableEpochMillis(ResultSet resultSet, String column) throws SQLException {
+        Object raw = resultSet.getObject(column);
+        if (raw == null) {
+            return null;
+        }
+        if (raw instanceof Number number) {
+            return number.longValue();
+        }
+        if (raw instanceof String stringValue) {
+            String normalized = stringValue.trim();
+            if (normalized.isEmpty()
+                    || normalized.equalsIgnoreCase("null")
+                    || normalized.equalsIgnoreCase("perm")
+                    || normalized.equalsIgnoreCase("permanent")
+                    || normalized.equalsIgnoreCase("forever")
+                    || normalized.equalsIgnoreCase("навсегда")) {
+                return null;
+            }
+            try {
+                return Long.parseLong(normalized);
+            } catch (NumberFormatException exception) {
+                throw new SQLException("Bad value for type Long", exception);
+            }
+        }
+        throw new SQLException("Bad value for type Long");
     }
 
     private PunishmentHistoryRecord buildHistory(PunishmentRecord record, String action) {
