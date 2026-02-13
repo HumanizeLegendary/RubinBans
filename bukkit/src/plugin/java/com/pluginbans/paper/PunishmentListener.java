@@ -79,9 +79,6 @@ public final class PunishmentListener implements Listener {
             event.setCancelled(true);
             return;
         }
-        if (event.getPlayer().hasPermission("bans.fullaccess")) {
-            return;
-        }
         List<PunishmentRecord> punishments = service.core().getActiveByUuid(uuid).join().all();
         Optional<PunishmentRecord> mute = punishments.stream()
                 .filter(record -> record.type() == PunishmentType.MUTE)
@@ -164,9 +161,6 @@ public final class PunishmentListener implements Listener {
     @EventHandler
     public void onCommand(PlayerCommandPreprocessEvent event) {
         if (!service.config().muteBlockCommands()) {
-            return;
-        }
-        if (event.getPlayer().hasPermission("bans.fullaccess")) {
             return;
         }
         List<PunishmentRecord> punishments = service.core().getActiveByUuid(event.getPlayer().getUniqueId()).join().all();
