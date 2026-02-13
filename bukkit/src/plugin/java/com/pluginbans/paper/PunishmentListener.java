@@ -1,6 +1,7 @@
 package com.pluginbans.paper;
 
 import com.pluginbans.core.DurationFormatter;
+import com.pluginbans.core.IpHashing;
 import com.pluginbans.core.PunishmentRecord;
 import com.pluginbans.core.PunishmentType;
 import io.papermc.paper.event.player.AsyncChatEvent;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
 
 public final class PunishmentListener implements Listener {
@@ -34,10 +36,13 @@ public final class PunishmentListener implements Listener {
 
     @EventHandler
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
-        String ip = event.getAddress().getHostAddress();
+        String ip = event.getAddress() == null ? null : event.getAddress().getHostAddress();
         UUID uuid = event.getUniqueId();
         List<PunishmentRecord> punishments = new java.util.ArrayList<>(service.core().getActiveByUuid(uuid).join().all());
-        punishments.addAll(service.core().getActiveByIp(ip).join());
+        if (ip != null && !ip.isBlank()) {
+            punishments.addAll(service.core().getActiveByIp(ip).join());
+            punishments.addAll(service.core().getActiveByIpHash(IpHashing.hash(ip)).join());
+        }
         Optional<PunishmentRecord> ban = punishments.stream()
                 .filter(record -> record.type() == PunishmentType.BAN
                         || record.type() == PunishmentType.TEMPBAN
@@ -51,9 +56,10 @@ public final class PunishmentListener implements Listener {
         String message = service.messageService().applyPlaceholders(messages.kickMessage(), Map.of(
                 "%reason%", record.reason(),
                 "%time%", time,
-                "%actor%", record.actor()
+                "%actor%", record.actor(),
+                "%id%", record.internalId()
         ));
-        Component component = service.messageService().format(message);
+        Component component = service.messageService().formatRaw(message);
         event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED, component);
     }
 
@@ -106,10 +112,48 @@ public final class PunishmentListener implements Listener {
         UUID uuid = event.getPlayer().getUniqueId();
         String ip = event.getPlayer().getAddress() == null ? null : event.getPlayer().getAddress().getAddress().getHostAddress();
         service.core().track(uuid, ip);
-        service.core().getActiveByUuid(uuid).thenAccept(active -> {
-            if (active.has(PunishmentType.CHECK)) {
-                checkManager.startCheck(uuid, active.get(PunishmentType.CHECK).map(PunishmentRecord::endTime).orElse(null));
+        CompletableFuture<List<PunishmentRecord>> byIpFuture;
+        if (ip == null || ip.isBlank()) {
+            byIpFuture = CompletableFuture.completedFuture(List.of());
+        } else {
+            byIpFuture = service.core().getActiveByIp(ip)
+                    .thenCombine(service.core().getActiveByIpHash(IpHashing.hash(ip)), (byIp, byHash) -> {
+                        List<PunishmentRecord> merged = new java.util.ArrayList<>(byIp);
+                        merged.addAll(byHash);
+                        return merged;
+                    });
+        }
+        service.core().getActiveByUuid(uuid).thenCombine(byIpFuture, (activeByUuid, activeByIp) -> {
+            List<PunishmentRecord> merged = new java.util.ArrayList<>(activeByUuid.all());
+            merged.addAll(activeByIp);
+            return merged;
+        }).thenAccept(punishments -> {
+            Optional<PunishmentRecord> ban = punishments.stream()
+                    .filter(record -> record.type() == PunishmentType.BAN
+                            || record.type() == PunishmentType.TEMPBAN
+                            || record.type() == PunishmentType.IPBAN)
+                    .findFirst();
+            if (ban.isPresent()) {
+                PunishmentRecord record = ban.get();
+                String time = DurationFormatter.formatSeconds(record.durationSeconds());
+                String message = service.messageService().applyPlaceholders(messages.kickMessage(), Map.of(
+                        "%reason%", record.reason(),
+                        "%time%", time,
+                        "%actor%", record.actor(),
+                        "%id%", record.internalId()
+                ));
+                service.runSync(() -> {
+                    org.bukkit.entity.Player online = org.bukkit.Bukkit.getPlayer(uuid);
+                    if (online != null && online.isOnline()) {
+                        online.kick(service.messageService().formatRaw(message));
+                    }
+                });
+                return;
             }
+            Optional<PunishmentRecord> check = punishments.stream()
+                    .filter(record -> record.type() == PunishmentType.CHECK)
+                    .findFirst();
+            check.ifPresent(record -> checkManager.startCheck(uuid, record.endTime()));
         });
     }
 

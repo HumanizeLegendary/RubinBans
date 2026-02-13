@@ -58,7 +58,7 @@ public final class PunishmentService implements AutoCloseable {
 
     public CompletableFuture<PunishmentRecord> createPunishment(PunishmentRecord record) {
         return repository.addPunishment(record).thenApply(ignored -> {
-            updateCache(record.uuid());
+            refreshCache(record.uuid());
             notifyCreate(record);
             return record;
         });
@@ -72,7 +72,7 @@ public final class PunishmentService implements AutoCloseable {
             PunishmentRecord record = optional.get();
             return repository.deactivate(internalId, actor, reason, action)
                     .thenRun(() -> {
-                        updateCache(record.uuid());
+                        refreshCache(record.uuid());
                         notifyRemove(record, reason);
                     });
         });
@@ -108,11 +108,24 @@ public final class PunishmentService implements AutoCloseable {
         return repository.findHistory(uuid);
     }
 
+    public CompletableFuture<Optional<PunishmentRecord>> findByInternalId(String internalId) {
+        return repository.findByInternalId(internalId);
+    }
+
     private void poll() {
         for (Map.Entry<UUID, String> entry : trackedIps.entrySet()) {
             UUID uuid = entry.getKey();
             updateCache(uuid);
         }
+    }
+
+    private void refreshCache(UUID uuid) {
+        if (uuid == null) {
+            return;
+        }
+        repository.findActiveByUuid(uuid)
+                .thenCompose(this::expireIfNeeded)
+                .thenAccept(records -> cache.put(uuid, new ActivePunishment(records)));
     }
 
     private void updateCache(UUID uuid) {
@@ -127,10 +140,6 @@ public final class PunishmentService implements AutoCloseable {
                     cache.put(uuid, current);
                     if (previous != null) {
                         detectChanges(previous, current);
-                    } else {
-                        for (PunishmentRecord record : current.all()) {
-                            notifyCreate(record);
-                        }
                     }
                 });
     }

@@ -7,6 +7,9 @@ commands:
   ban:
     description: "Выдать бан."
     usage: "/ban <игрок|uuid> <длительность> <причина>"
+  tempban:
+    description: "Выдать временный бан."
+    usage: "/tempban <игрок|uuid> <длительность> <причина>"
   ipban:
     description: "Выдать IP-бан."
     usage: "/ipban <игрок|uuid> <длительность> <причина>"
@@ -20,10 +23,12 @@ commands:
     description: "Выдать кастомное наказание."
     usage: "/punish <игрок|uuid> <тип> <длительность> <причина>"
   checkpunish:
-    description: "Отправить на проверку."
-    usage: "/checkpunish <игрок|uuid> [длительность] [причина]"
+    description: "Проверить наказание по ID."
+    usage: "/checkpunish <id>"
 permissions:
   bans.ban:
+    default: op
+  bans.tempban:
     default: op
   bans.ipban:
     default: op

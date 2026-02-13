@@ -23,6 +23,10 @@ public final class MessageService {
         return miniMessage.deserialize(messages.prefix() + message);
     }
 
+    public Component formatRaw(String message) {
+        return miniMessage.deserialize(message);
+    }
+
     public String applyPlaceholders(String template, Map<String, String> placeholders) {
         String result = template;
         for (Map.Entry<String, String> entry : placeholders.entrySet()) {

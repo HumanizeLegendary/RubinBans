@@ -26,7 +26,7 @@ public final class CustomPunishCommand implements CommandExecutor {
             return true;
         }
         if (args.length < 4) {
-            service.messageService().send(sender, messages.error("usage"));
+            sendUsage(sender, command);
             return true;
         }
         Optional<UUID> uuid = PlayerResolver.resolveUuid(args[0]);
@@ -49,6 +49,10 @@ public final class CustomPunishCommand implements CommandExecutor {
             service.messageService().send(sender, messages.error("duration"));
             return true;
         }
+        if (type == PunishmentType.TEMPBAN && durationSeconds == 0L) {
+            service.messageService().send(sender, "<red>Для временного бана укажите срок больше 0.</red>");
+            return true;
+        }
         String reason = joinArgs(args, 3);
         if (reason.isBlank()) {
             service.messageService().send(sender, messages.error("reason"));
@@ -59,8 +63,21 @@ public final class CustomPunishCommand implements CommandExecutor {
         UUID target = uuid.get();
         String actor = sender.getName();
         String ip = PlayerResolver.resolveIp(target).orElse(null);
+        if (type == PunishmentType.IPBAN && (ip == null || ip.isBlank())) {
+            service.messageService().send(sender, "<red>Для IP-бана игрок должен быть онлайн.</red>");
+            return true;
+        }
         service.issuePunishment(target, type.name(), reason.trim(), durationSeconds, actor, ip, silent, nnr);
         return true;
+    }
+
+    private void sendUsage(CommandSender sender, Command command) {
+        String usage = command.getUsage();
+        if (usage == null || usage.isBlank()) {
+            service.messageService().send(sender, messages.error("usage"));
+            return;
+        }
+        service.messageService().send(sender, "<red>Использование:</red> <white>" + usage + "</white>");
     }
 
     private boolean hasFlag(String[] args, String flag) {

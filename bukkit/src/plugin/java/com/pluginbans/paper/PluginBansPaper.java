@@ -51,6 +51,7 @@ public final class PluginBansPaper extends JavaPlugin {
 
     private void registerCommands() {
         getCommand("ban").setExecutor(new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.BAN));
+        getCommand("tempban").setExecutor(new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.TEMPBAN));
         getCommand("ipban").setExecutor(new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.IPBAN));
         getCommand("mute").setExecutor(new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.MUTE));
         getCommand("warn").setExecutor(new StandardPunishCommand(punishmentService, messages, StandardPunishCommand.Type.WARN));

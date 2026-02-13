@@ -168,8 +168,9 @@ public final class PaperPunishmentService implements PunishmentListener {
         String message = messageService.applyPlaceholders(messages.kickMessage(), Map.of(
                 "%reason%", record.reason(),
                 "%time%", time,
-                "%actor%", record.actor()
+                "%actor%", record.actor(),
+                "%id%", record.internalId()
         ));
-        runSync(() -> player.kick(messageService.format(message)));
+        runSync(() -> player.kick(messageService.formatRaw(message)));
     }
 }

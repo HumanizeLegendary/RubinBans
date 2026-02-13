@@ -6,13 +6,13 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 
-import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
 public final class StandardPunishCommand implements CommandExecutor {
     enum Type {
         BAN("BAN", "bans.ban"),
+        TEMPBAN("TEMPBAN", "bans.tempban"),
         IPBAN("IPBAN", "bans.ipban"),
         MUTE("MUTE", "bans.mute"),
         WARN("WARN", "bans.warn"),
@@ -56,6 +56,10 @@ public final class StandardPunishCommand implements CommandExecutor {
         if (durationSeconds < 0) {
             return true;
         }
+        if (type == Type.TEMPBAN && durationSeconds == 0L) {
+            service.messageService().send(sender, "<red>Для временного бана укажите срок больше 0.</red>");
+            return true;
+        }
         String reason = joinArgs(args, type == Type.WARN ? 1 : 2);
         if (reason.isBlank()) {
             service.messageService().send(sender, messages.error("reason"));
@@ -66,6 +70,10 @@ public final class StandardPunishCommand implements CommandExecutor {
         UUID target = uuid.get();
         String actor = sender.getName();
         String ip = PlayerResolver.resolveIp(target).orElse(null);
+        if (type == Type.IPBAN && (ip == null || ip.isBlank())) {
+            service.messageService().send(sender, "<red>Для IP-бана игрок должен быть онлайн.</red>");
+            return true;
+        }
         service.issuePunishment(target, type.typeName, reason.trim(), durationSeconds, actor, ip, silent, nnr)
                 .thenAccept(record -> {
                     if (type == Type.WARN) {
