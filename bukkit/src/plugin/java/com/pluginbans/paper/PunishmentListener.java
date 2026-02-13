@@ -62,6 +62,7 @@ public final class PunishmentListener implements Listener {
                 "%id%", record.internalId()
         ));
         String message = withIdIfMissing(messages.kickMessage(), rendered, record.internalId());
+        message = service.messageService().hideIssuerDetails(message);
         Component component = service.messageService().formatRaw(message);
         event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED, component);
     }
@@ -134,10 +135,11 @@ public final class PunishmentListener implements Listener {
                         "%id%", record.internalId()
                 ));
                 String message = withIdIfMissing(messages.kickMessage(), rendered, record.internalId());
+                String finalMessage = service.messageService().hideIssuerDetails(message);
                 service.runSync(() -> {
                     org.bukkit.entity.Player online = org.bukkit.Bukkit.getPlayer(uuid);
                     if (online != null && online.isOnline()) {
-                        online.kick(service.messageService().formatRaw(message));
+                        online.kick(service.messageService().formatRaw(finalMessage));
                     }
                 });
                 return;

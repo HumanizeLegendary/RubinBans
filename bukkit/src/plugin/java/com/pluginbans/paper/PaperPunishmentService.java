@@ -186,6 +186,7 @@ public final class PaperPunishmentService implements PunishmentListener {
                     "%id%", record.internalId()
             ));
             String message = ensureIdInMessage(template, rendered, record.internalId());
+            message = messageService.hideIssuerDetails(message);
             player.sendMessage(messageService.format(message));
         });
     }
@@ -204,6 +205,7 @@ public final class PaperPunishmentService implements PunishmentListener {
                     "%id%", record.internalId()
             ));
             String message = ensureIdInMessage(messages.kickMessage(), rendered, record.internalId());
+            message = messageService.hideIssuerDetails(message);
             player.kick(messageService.formatRaw(message));
         });
     }

@@ -10,7 +10,6 @@ kick: |-
   <red>Вы заблокированы.</red>
   <gray>Причина:</gray> <white>%reason%</white>
   <gray>Длительность:</gray> <white>%time%</white>
-  <gray>Выдал:</gray> <white>%actor%</white>
   <gray>ID наказания:</gray> <white>%id%</white>
   <gray>------------------------------</gray>
 

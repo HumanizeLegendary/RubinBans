@@ -135,10 +135,9 @@ public final class PluginBansVelocity implements PunishmentListener {
                 Вы заблокированы.
                 Причина: %s
                 Длительность: %s
-                Выдал: %s
                 ID наказания: %s
                 ------------------------------
-                """.formatted(record.reason(), time, record.actor(), record.internalId());
+                """.formatted(record.reason(), time, record.internalId());
         return Component.text(message);
     }
 }
