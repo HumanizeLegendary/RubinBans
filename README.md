@@ -158,6 +158,16 @@ api:
 }
 ```
 
+## Python Gateway (опционально)
+
+Если нужен отдельный внешний веб-сервер (например, для Pterodactyl), используйте
+`python-gateway/`:
+
+* `python-gateway/app.py` — FastAPI gateway
+* `python-gateway/README.md` — установка и запуск
+
+Схема: внешний клиент -> Python gateway -> локальный PluginBans API (`127.0.0.1:8777`).
+
 ## DiscordBridge
 
 Сервис `DiscordBridge` формирует JSON-пакет для синхронизации:

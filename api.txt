@@ -176,3 +176,24 @@ History item fields:
 - Response header includes: X-PluginBans-Api-Version: v1
 - CORS is enabled with Access-Control-Allow-Origin: *
 - Allowed methods: GET, POST, OPTIONS
+
+6) Python gateway mode (Pterodactyl-friendly)
+---------------------------------------------
+If you prefer separate Python web-server, use folder:
+- python-gateway/app.py
+- python-gateway/README.md
+
+Recommended topology:
+- PluginBans API is local-only:
+  api.bind: "127.0.0.1"
+  api.port: 8777
+- Python gateway is public:
+  uvicorn app:app --host 0.0.0.0 --port 8080
+
+Gateway environment:
+- PLUGINBANS_BASE_URL="http://127.0.0.1:8777/api/v1"
+- PLUGINBANS_TOKEN="<plugin token>"
+- GATEWAY_TOKEN="<external token>"
+
+External clients call Python gateway with GATEWAY_TOKEN.
+Python gateway forwards requests to PluginBans API with PLUGINBANS_TOKEN.
