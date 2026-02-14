@@ -1,0 +1,178 @@
+PluginBans API Guide (v1)
+=========================
+
+1) Enable API in config
+-----------------------
+File: plugins/PluginBans/config.yml
+
+api:
+  enabled: true
+  bind: "127.0.0.1"
+  port: 8777
+  token: "PUT_LONG_RANDOM_TOKEN_HERE"
+
+Token requirements:
+- minimum 16 chars
+- must not be one of defaults: CHANGE_ME, CHANGE_ME_LONG_RANDOM_TOKEN, PASTE_LONG_RANDOM_TOKEN
+
+Base URL:
+http://<bind>:<port>/api/v1
+
+2) Authentication
+-----------------
+Use one of headers:
+- X-API-Token: <token>
+- Authorization: Bearer <token>
+
+If token is missing/wrong -> 401 Unauthorized.
+
+3) Endpoints
+------------
+
+3.1 GET /health
+- Purpose: health check
+- Success: 200
+
+Example response:
+{
+  "ok": true,
+  "time": "2026-02-14T12:00:00Z"
+}
+
+3.2 GET /meta
+- Purpose: API metadata and defaults
+- Success: 200
+
+Example response fields:
+- apiVersion
+- warnAllowedReasons
+- warnExternalActors
+- defaults.warnDurationSeconds
+- defaults.checkDurationSeconds
+- defaults.checkTimeoutBanSeconds
+- endpoints
+
+3.3 POST /punishments
+- Purpose: create punishment
+- Success: 201
+
+Required JSON fields:
+- target (player name or uuid)
+- type (BAN, TEMPBAN, IPBAN, MUTE, WARN, CHECK)
+- reason
+
+Optional fields:
+- duration (string, for example "1d2h30m")
+- durationSeconds (number, >= 0)
+- actor (default: "ForumAPI")
+- silent (boolean, default: false)
+- nnr (boolean, default: false)
+
+Validation rules:
+- TEMPBAN requires duration > 0
+- IPBAN requires target player online (to resolve IP)
+- WARN reason must be from warn.allowed-reasons
+- WARN actor must be in warn.external-actors
+
+Example request:
+{
+  "target": "PlayerName",
+  "type": "MUTE",
+  "reason": "Flood",
+  "duration": "30m",
+  "actor": "ForumModerator",
+  "silent": false,
+  "nnr": false
+}
+
+Example success response:
+{
+  "ok": true,
+  "punishment": {
+    "id": "A1B2C3",
+    "uuid": "00000000-0000-0000-0000-000000000000",
+    "type": "MUTE",
+    "reason": "Flood",
+    "actor": "ForumModerator",
+    "active": true,
+    "silent": false,
+    "ip": null,
+    "startTime": 1760000000000,
+    "endTime": 1760001800000,
+    "durationSeconds": 1800
+  }
+}
+
+3.4 GET /punishments/{id}
+- Purpose: get punishment by internal short id
+- Success: 200
+- Not found: 404
+
+3.5 POST /punishments/{id}/revoke
+- Purpose: revoke punishment
+- Success: 200
+
+Optional JSON fields:
+- actor (default: "ForumAPI")
+- reason (default: "Снято через API")
+
+Special cases:
+- not found -> 404
+- already inactive -> 409 (returns current punishment payload)
+
+Example request:
+{
+  "actor": "ForumModerator",
+  "reason": "Appeal approved"
+}
+
+3.6 GET /players/{target}/active
+- Purpose: get all active punishments for player
+- target supports name or uuid
+- Success: 200
+
+Response fields:
+- ok
+- uuid
+- active (array of punishment objects)
+
+3.7 GET /players/{target}/history
+- Purpose: get punishment history for player
+- target supports name or uuid
+- Success: 200
+
+Response fields:
+- ok
+- uuid
+- history (array)
+
+History item fields:
+- id
+- internalId
+- uuid
+- type
+- action
+- reason
+- actor
+- startTime
+- endTime
+- actionTime
+
+4) Common HTTP statuses
+-----------------------
+- 200: success
+- 201: created
+- 204: OPTIONS preflight
+- 400: bad request / invalid payload
+- 401: unauthorized
+- 403: forbidden (for example WARN actor is not allowed)
+- 404: not found
+- 409: conflict (for example revoke inactive punishment)
+- 500: internal server error
+
+5) Notes
+--------
+- API responses are JSON UTF-8.
+- Response header includes: X-PluginBans-Api-Version: v1
+- CORS is enabled with Access-Control-Allow-Origin: *
+- Allowed methods: GET, POST, OPTIONS
