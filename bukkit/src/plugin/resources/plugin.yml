@@ -7,23 +7,32 @@ commands:
   ban:
     description: "Выдать бан."
     usage: "/ban <игрок|uuid> <длительность> <причина>"
+  tempban:
+    description: "Выдать временный бан."
+    usage: "/tempban <игрок|uuid> <длительность> <причина>"
   ipban:
     description: "Выдать IP-бан."
     usage: "/ipban <игрок|uuid> <длительность> <причина>"
   mute:
     description: "Выдать мут."
     usage: "/mute <игрок|uuid> <длительность> <причина>"
+    aliases: ["pbmute", "amute"]
   warn:
     description: "Выдать предупреждение."
-    usage: "/warn <игрок|uuid> <причина>"
+    usage: "/warn <игрок|uuid> <причина(1|2)>"
   punish:
-    description: "Выдать кастомное наказание."
-    usage: "/punish <игрок|uuid> <тип> <длительность> <причина>"
+    description: "Выдать наказание через меню или вручную."
+    usage: "/punish <игрок|uuid> [тип длительность причина]"
   checkpunish:
-    description: "Отправить на проверку."
-    usage: "/checkpunish <игрок|uuid> [длительность] [причина]"
+    description: "Проверить наказание по ID."
+    usage: "/checkpunish <id>"
+  unpunish:
+    description: "Снять наказание по ID."
+    usage: "/unpunish <id> [причина]"
 permissions:
   bans.ban:
+    default: op
+  bans.tempban:
     default: op
   bans.ipban:
     default: op
@@ -34,6 +43,8 @@ permissions:
   bans.punish:
     default: op
   bans.check:
+    default: op
+  bans.unpunish:
     default: op
   bans.fullaccess:
     default: op

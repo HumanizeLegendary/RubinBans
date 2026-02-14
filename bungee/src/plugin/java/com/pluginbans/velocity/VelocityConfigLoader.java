@@ -32,6 +32,7 @@ public final class VelocityConfigLoader {
             String password = parseString(lines, "password", defaults.databaseConfig().password());
             int poolSize = parseInt(lines, "pool-size", defaults.databaseConfig().maxPoolSize());
             String sqliteFile = parseString(lines, "sqlite-file", defaults.databaseConfig().sqlitePath());
+            int syncPollSeconds = Math.max(1, parseInt(lines, "sync-poll-seconds", defaults.syncPollSeconds()));
             int throttleMax = parseInt(lines, "max-connections", defaults.throttleMaxConnections());
             int throttleWindow = parseInt(lines, "window-seconds", defaults.throttleWindowSeconds());
             DatabaseConfig databaseConfig = new DatabaseConfig(
@@ -47,6 +48,7 @@ public final class VelocityConfigLoader {
             return new VelocityConfig(
                     databaseConfig,
                     lobbyServers.isEmpty() ? defaults.lobbyServers() : lobbyServers,
+                    syncPollSeconds,
                     throttleMax,
                     throttleWindow,
                     defaults.auditPath()
@@ -62,6 +64,7 @@ public final class VelocityConfigLoader {
             String content = """
                     [pluginbans]
                     lobby-servers = ["lobby", "hub"]
+                    sync-poll-seconds = 2
 
                     [database]
                     type = "SQLITE"

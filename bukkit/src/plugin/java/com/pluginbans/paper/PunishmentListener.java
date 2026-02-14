@@ -2,6 +2,7 @@ package com.pluginbans.paper;
 
 import com.pluginbans.core.DurationFormatter;
 import com.pluginbans.core.PunishmentRecord;
+import com.pluginbans.core.PunishmentRules;
 import com.pluginbans.core.PunishmentType;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
@@ -34,26 +35,35 @@ public final class PunishmentListener implements Listener {
 
     @EventHandler
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
-        String ip = event.getAddress().getHostAddress();
+        String ip = event.getAddress() == null ? null : event.getAddress().getHostAddress();
         UUID uuid = event.getUniqueId();
-        List<PunishmentRecord> punishments = new java.util.ArrayList<>(service.core().getActiveByUuid(uuid).join().all());
-        punishments.addAll(service.core().getActiveByIp(ip).join());
+        List<PunishmentRecord> punishments;
+        try {
+            punishments = service.core().getActiveForConnection(uuid, ip).join();
+        } catch (RuntimeException exception) {
+            service.logError("Не удалось проверить наказания перед входом: " + uuid, exception);
+            event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, service.messageService().formatRaw(
+                    "<red>Сервис наказаний временно недоступен. Попробуйте позже.</red>"
+            ));
+            return;
+        }
         Optional<PunishmentRecord> ban = punishments.stream()
-                .filter(record -> record.type() == PunishmentType.BAN
-                        || record.type() == PunishmentType.TEMPBAN
-                        || record.type() == PunishmentType.IPBAN)
+                .filter(record -> PunishmentRules.blocksLogin(record.type()))
                 .findFirst();
         if (ban.isEmpty()) {
             return;
         }
         PunishmentRecord record = ban.get();
         String time = DurationFormatter.formatSeconds(record.durationSeconds());
-        String message = service.messageService().applyPlaceholders(messages.kickMessage(), Map.of(
+        String rendered = service.messageService().applyPlaceholders(messages.kickMessage(), Map.of(
                 "%reason%", record.reason(),
                 "%time%", time,
-                "%actor%", record.actor()
+                "%actor%", record.actor(),
+                "%id%", record.internalId()
         ));
-        Component component = service.messageService().format(message);
+        String message = withIdIfMissing(messages.kickMessage(), rendered, record.internalId());
+        message = service.messageService().hideIssuerDetails(message);
+        Component component = service.messageService().formatRaw(message);
         event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED, component);
     }
 
@@ -71,10 +81,15 @@ public final class PunishmentListener implements Listener {
             event.setCancelled(true);
             return;
         }
-        if (event.getPlayer().hasPermission("bans.fullaccess")) {
+        List<PunishmentRecord> punishments;
+        try {
+            punishments = service.core().getActiveByUuid(uuid).join().all();
+        } catch (RuntimeException exception) {
+            service.logError("Не удалось проверить мут для " + uuid, exception);
+            event.setCancelled(true);
+            event.getPlayer().sendMessage(service.messageService().format("<red>Сервис наказаний временно недоступен.</red>"));
             return;
         }
-        List<PunishmentRecord> punishments = service.core().getActiveByUuid(uuid).join().all();
         Optional<PunishmentRecord> mute = punishments.stream()
                 .filter(record -> record.type() == PunishmentType.MUTE)
                 .findFirst();
@@ -82,13 +97,14 @@ public final class PunishmentListener implements Listener {
             return;
         }
         String messageText = PlainTextComponentSerializer.plainText().serialize(event.message());
-        String response = service.messageService().applyPlaceholders(messages.mutedChatMessage(), Map.of(
-                "%reason%", mute.get().reason(),
-                "%time%", DurationFormatter.formatSeconds(mute.get().durationSeconds()),
-                "%message%", messageText
-        ));
+        String response = muteBlockedMessage(mute.get(), messageText);
         event.setCancelled(true);
-        event.getPlayer().sendMessage(service.messageService().format(response));
+        service.runSync(() -> {
+            org.bukkit.entity.Player online = org.bukkit.Bukkit.getPlayer(uuid);
+            if (online != null && online.isOnline()) {
+                online.sendMessage(service.messageService().format(response));
+            }
+        });
     }
 
     @EventHandler
@@ -106,10 +122,36 @@ public final class PunishmentListener implements Listener {
         UUID uuid = event.getPlayer().getUniqueId();
         String ip = event.getPlayer().getAddress() == null ? null : event.getPlayer().getAddress().getAddress().getHostAddress();
         service.core().track(uuid, ip);
-        service.core().getActiveByUuid(uuid).thenAccept(active -> {
-            if (active.has(PunishmentType.CHECK)) {
-                checkManager.startCheck(uuid, active.get(PunishmentType.CHECK).map(PunishmentRecord::endTime).orElse(null));
+        service.core().getActiveForConnection(uuid, ip).thenAccept(punishments -> {
+            Optional<PunishmentRecord> ban = punishments.stream()
+                    .filter(record -> PunishmentRules.blocksLogin(record.type()))
+                    .findFirst();
+            if (ban.isPresent()) {
+                PunishmentRecord record = ban.get();
+                String time = DurationFormatter.formatSeconds(record.durationSeconds());
+                String rendered = service.messageService().applyPlaceholders(messages.kickMessage(), Map.of(
+                        "%reason%", record.reason(),
+                        "%time%", time,
+                        "%actor%", record.actor(),
+                        "%id%", record.internalId()
+                ));
+                String message = withIdIfMissing(messages.kickMessage(), rendered, record.internalId());
+                String finalMessage = service.messageService().hideIssuerDetails(message);
+                service.runSync(() -> {
+                    org.bukkit.entity.Player online = org.bukkit.Bukkit.getPlayer(uuid);
+                    if (online != null && online.isOnline()) {
+                        online.kick(service.messageService().formatRaw(finalMessage));
+                    }
+                });
+                return;
             }
+            Optional<PunishmentRecord> check = punishments.stream()
+                    .filter(record -> record.type() == PunishmentType.CHECK)
+                    .findFirst();
+            check.ifPresent(record -> checkManager.startCheck(uuid, record.endTime()));
+        }).exceptionally(exception -> {
+            service.logError("Не удалось обработать активные наказания после входа: " + uuid, exception);
+            return null;
         });
     }
 
@@ -118,17 +160,20 @@ public final class PunishmentListener implements Listener {
         if (!service.config().muteBlockCommands()) {
             return;
         }
-        if (event.getPlayer().hasPermission("bans.fullaccess")) {
+        UUID uuid = event.getPlayer().getUniqueId();
+        List<PunishmentRecord> punishments;
+        try {
+            punishments = service.core().getActiveByUuid(uuid).join().all();
+        } catch (RuntimeException exception) {
+            service.logError("Не удалось проверить мут при выполнении команды: " + uuid, exception);
+            event.setCancelled(true);
+            event.getPlayer().sendMessage(service.messageService().format("<red>Сервис наказаний временно недоступен.</red>"));
             return;
         }
-        List<PunishmentRecord> punishments = service.core().getActiveByUuid(event.getPlayer().getUniqueId()).join().all();
         Optional<PunishmentRecord> mute = punishments.stream().filter(record -> record.type() == PunishmentType.MUTE).findFirst();
         if (mute.isPresent()) {
             event.setCancelled(true);
-            String response = service.messageService().applyPlaceholders(messages.mutedChatMessage(), Map.of(
-                    "%reason%", mute.get().reason(),
-                    "%time%", DurationFormatter.formatSeconds(mute.get().durationSeconds())
-            ));
+            String response = muteBlockedMessage(mute.get(), event.getMessage());
             event.getPlayer().sendMessage(service.messageService().format(response));
         }
     }
@@ -144,5 +189,22 @@ public final class PunishmentListener implements Listener {
         org.bukkit.Bukkit.getOnlinePlayers().stream()
                 .filter(player -> player.hasPermission("bans.check") || player.hasPermission("bans.fullaccess"))
                 .forEach(player -> player.sendMessage(service.messageService().format(message)));
+    }
+
+    private String muteBlockedMessage(PunishmentRecord mute, String originalMessage) {
+        String rendered = service.messageService().applyPlaceholders(messages.mutedChatMessage(), Map.of(
+                "%reason%", mute.reason(),
+                "%time%", DurationFormatter.formatSeconds(mute.durationSeconds()),
+                "%id%", mute.internalId(),
+                "%message%", originalMessage == null ? "" : originalMessage
+        ));
+        return withIdIfMissing(messages.mutedChatMessage(), rendered, mute.internalId());
+    }
+
+    private String withIdIfMissing(String template, String rendered, String id) {
+        if (template != null && template.contains("%id%")) {
+            return rendered;
+        }
+        return rendered + "\n<gray>ID наказания:</gray> <white>" + id + "</white>";
     }
 }

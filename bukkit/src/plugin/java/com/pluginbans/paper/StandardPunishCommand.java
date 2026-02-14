@@ -1,18 +1,21 @@
 package com.pluginbans.paper;
 
+import com.pluginbans.core.DurationFormatter;
 import com.pluginbans.core.DurationParser;
+import com.pluginbans.core.PunishmentRules;
+import com.pluginbans.core.PunishmentRecord;
 import com.pluginbans.core.PunishmentType;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 
-import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
 public final class StandardPunishCommand implements CommandExecutor {
     enum Type {
         BAN("BAN", "bans.ban"),
+        TEMPBAN("TEMPBAN", "bans.tempban"),
         IPBAN("IPBAN", "bans.ipban"),
         MUTE("MUTE", "bans.mute"),
         WARN("WARN", "bans.warn"),
@@ -44,7 +47,7 @@ public final class StandardPunishCommand implements CommandExecutor {
             return true;
         }
         if (args.length < 2) {
-            service.messageService().send(sender, messages.error("usage"));
+            sendUsage(sender, command);
             return true;
         }
         Optional<UUID> uuid = PlayerResolver.resolveUuid(args[0]);
@@ -56,28 +59,72 @@ public final class StandardPunishCommand implements CommandExecutor {
         if (durationSeconds < 0) {
             return true;
         }
+        if (type == Type.TEMPBAN && durationSeconds == 0L) {
+            service.messageService().send(sender, "<red>Для временного бана укажите срок больше 0.</red>");
+            return true;
+        }
         String reason = joinArgs(args, type == Type.WARN ? 1 : 2);
         if (reason.isBlank()) {
             service.messageService().send(sender, messages.error("reason"));
             return true;
+        }
+        if (type == Type.WARN) {
+            Optional<String> normalizedWarn = service.normalizeWarnReason(reason);
+            if (normalizedWarn.isEmpty()) {
+                service.messageService().send(sender, "<red>Для WARN доступно только 2 причины.</red>");
+                service.messageService().send(sender, service.warnReasonsHint());
+                return true;
+            }
+            reason = normalizedWarn.get();
         }
         boolean silent = hasFlag(args, "-s");
         boolean nnr = hasFlag(args, "-nnr");
         UUID target = uuid.get();
         String actor = sender.getName();
         String ip = PlayerResolver.resolveIp(target).orElse(null);
+        if (type == Type.IPBAN && (ip == null || ip.isBlank())) {
+            service.messageService().send(sender, "<red>Для IP-бана игрок должен быть онлайн.</red>");
+            return true;
+        }
         service.issuePunishment(target, type.typeName, reason.trim(), durationSeconds, actor, ip, silent, nnr)
-                .thenAccept(record -> {
+                .whenComplete((record, throwable) -> {
+                    if (throwable != null) {
+                        service.logError("Не удалось выдать наказание " + type.typeName + " для " + target, throwable);
+                        service.runSync(() -> service.messageService().send(sender, "<red>Не удалось выдать наказание.</red>"));
+                        return;
+                    }
+                    service.runSync(() -> sendIssueSummary(sender, record));
                     if (type == Type.WARN) {
-                        service.core().getActiveByUuid(target).thenAccept(active -> {
+                        service.core().getActiveByUuid(target).whenComplete((active, warnThrowable) -> {
+                            if (warnThrowable != null) {
+                                service.logError("Не удалось проверить лимит предупреждений для " + target, warnThrowable);
+                                return;
+                            }
                             long warnCount = active.all().stream().filter(p -> p.type() == PunishmentType.WARN).count();
-                            if (warnCount >= 3 && ip != null) {
-                                service.issuePunishment(target, PunishmentType.IPBAN.name(), service.config().autoIpbanReason(), 0L, "Система", ip, false, false);
+                            boolean hasActiveBan = active.all().stream().anyMatch(p -> PunishmentRules.isBanLike(p.type()));
+                            if (warnCount >= 3 && !hasActiveBan) {
+                                service.issuePunishment(target, PunishmentType.BAN.name(), service.config().autoBanReason(), 0L, "Система", ip, false, false)
+                                        .exceptionally(autoBanThrowable -> {
+                                            service.logError("Не удалось выдать авто-бан после 3 предупреждений для " + target, autoBanThrowable);
+                                            return null;
+                                        });
                             }
                         });
                     }
                 });
         return true;
+    }
+
+    private void sendUsage(CommandSender sender, Command command) {
+        String usage = command.getUsage();
+        if (usage == null || usage.isBlank()) {
+            service.messageService().send(sender, messages.error("usage"));
+            return;
+        }
+        service.messageService().send(sender, "<red>Использование:</red> <white>" + usage + "</white>");
+        if (type == Type.WARN) {
+            service.messageService().send(sender, "<gray>Разрешенные причины:</gray> " + service.warnReasonsHint());
+        }
     }
 
     private long parseDuration(String input, CommandSender sender) {
@@ -96,6 +143,14 @@ public final class StandardPunishCommand implements CommandExecutor {
             }
         }
         return false;
+    }
+
+    private void sendIssueSummary(CommandSender sender, PunishmentRecord record) {
+        String time = DurationFormatter.formatSeconds(record.durationSeconds());
+        service.messageService().send(sender,
+                "<green>Наказание выдано:</green> <white>" + record.type().name() + "</white> <dark_gray>|</dark_gray> <gray>ID:</gray> <yellow>" + record.internalId() + "</yellow>");
+        service.messageService().send(sender,
+                "<gray>Причина:</gray> <white>" + record.reason() + "</white> <dark_gray>|</dark_gray> <gray>Срок:</gray> <white>" + time + "</white>");
     }
 
     private String joinArgs(String[] args, int start) {

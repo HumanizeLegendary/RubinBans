@@ -7,17 +7,23 @@ import com.pluginbans.core.PunishmentCreateEvent;
 import com.pluginbans.core.PunishmentIdGenerator;
 import com.pluginbans.core.PunishmentListener;
 import com.pluginbans.core.PunishmentRecord;
+import com.pluginbans.core.PunishmentRules;
 import com.pluginbans.core.PunishmentService;
 import com.pluginbans.core.PunishmentType;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
+import java.util.function.Supplier;
 
 public final class PaperPunishmentService implements PunishmentListener {
     private final Plugin plugin;
@@ -54,6 +60,13 @@ public final class PaperPunishmentService implements PunishmentListener {
         if (type == PunishmentType.BAN && durationSeconds > 0) {
             type = PunishmentType.TEMPBAN;
         }
+        if (type == PunishmentType.WARN) {
+            Optional<String> normalized = normalizeWarnReason(reason);
+            if (normalized.isEmpty()) {
+                return CompletableFuture.failedFuture(new IllegalArgumentException("Недопустимая причина WARN."));
+            }
+            reason = normalized.get();
+        }
         Instant start = Instant.now();
         Instant end = durationSeconds > 0 ? start.plusSeconds(durationSeconds) : null;
         String idCode = nnr ? "NNR" : (end == null ? "NV" : "TM");
@@ -81,6 +94,53 @@ public final class PaperPunishmentService implements PunishmentListener {
         return punishmentService.createPunishment(record);
     }
 
+    public Optional<String> normalizeWarnReason(String input) {
+        if (input == null) {
+            return Optional.empty();
+        }
+        String normalizedInput = normalize(input);
+        List<String> allowed = config.warnAllowedReasons();
+        try {
+            int index = Integer.parseInt(normalizedInput);
+            if (index >= 1 && index <= allowed.size()) {
+                return Optional.of(allowed.get(index - 1));
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        for (String reason : allowed) {
+            if (normalize(reason).equals(normalizedInput)) {
+                return Optional.of(reason);
+            }
+        }
+        return Optional.empty();
+    }
+
+    public boolean canIssueWarnFromExternalActor(String actor) {
+        if (actor == null || actor.isBlank()) {
+            return false;
+        }
+        String normalizedActor = normalize(actor);
+        return config.warnExternalActors().stream()
+                .map(this::normalize)
+                .anyMatch(normalizedActor::equals);
+    }
+
+    public String warnReasonsHint() {
+        StringBuilder builder = new StringBuilder();
+        List<String> allowed = config.warnAllowedReasons();
+        for (int i = 0; i < allowed.size(); i++) {
+            if (i > 0) {
+                builder.append(" <gray>|</gray> ");
+            }
+            builder.append("<white>").append(i + 1).append(") ").append(allowed.get(i)).append("</white>");
+        }
+        return builder.toString();
+    }
+
+    private String normalize(String value) {
+        return value.trim().toLowerCase(Locale.ROOT);
+    }
+
     public PunishmentService core() {
         return punishmentService;
     }
@@ -101,6 +161,22 @@ public final class PaperPunishmentService implements PunishmentListener {
         Bukkit.getScheduler().runTask(plugin, runnable);
     }
 
+    public <T> CompletableFuture<T> supplySync(Supplier<T> supplier) {
+        CompletableFuture<T> future = new CompletableFuture<>();
+        runSync(() -> {
+            try {
+                future.complete(supplier.get());
+            } catch (Throwable throwable) {
+                future.completeExceptionally(throwable);
+            }
+        });
+        return future;
+    }
+
+    public void logError(String message, Throwable throwable) {
+        plugin.getLogger().log(Level.SEVERE, message, throwable);
+    }
+
     @Override
     public void onCreate(PunishmentCreateEvent event) {
         PunishmentRecord record = event.record();
@@ -118,11 +194,11 @@ public final class PaperPunishmentService implements PunishmentListener {
             return;
         }
         if (record.type() == PunishmentType.WARN) {
-            sendPunished(record, messages.warnMessage());
+            kickIfOnline(record);
             broadcast(record, messages.warnMessage());
             return;
         }
-        if (record.type() == PunishmentType.BAN || record.type() == PunishmentType.TEMPBAN || record.type() == PunishmentType.IPBAN) {
+        if (PunishmentRules.isBanLike(record.type())) {
             kickIfOnline(record);
             broadcast(record, messages.banMessage());
         }
@@ -132,44 +208,78 @@ public final class PaperPunishmentService implements PunishmentListener {
         if (record.silent()) {
             return;
         }
-        String playerName = java.util.Optional.ofNullable(org.bukkit.Bukkit.getOfflinePlayer(record.uuid()).getName()).orElse(record.uuid().toString());
-        String time = DurationFormatter.formatSeconds(record.durationSeconds());
-        String message = messageService.applyPlaceholders(template, Map.of(
-                "%player%", playerName,
-                "%reason%", record.reason(),
-                "%time%", time,
-                "%actor%", record.actor()
-        ));
-        runSync(() -> Bukkit.broadcast(messageService.format(message), "bans.fullaccess"));
+        runSync(() -> {
+            OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(record.uuid());
+            String playerName = java.util.Optional.ofNullable(offlinePlayer.getName()).orElse(record.uuid().toString());
+            String time = DurationFormatter.formatSeconds(record.durationSeconds());
+            String rendered = messageService.applyPlaceholders(template, Map.of(
+                    "%player%", playerName,
+                    "%reason%", record.reason(),
+                    "%time%", time,
+                    "%actor%", record.actor(),
+                    "%id%", record.internalId()
+            ));
+            String message = ensureIdInMessage(template, rendered, record.internalId());
+            Bukkit.getOnlinePlayers().stream()
+                    .filter(this::canReceiveNotifications)
+                    .forEach(player -> player.sendMessage(messageService.format(message)));
+        });
     }
 
     private void sendPunished(PunishmentRecord record, String template) {
-        Player player = Bukkit.getPlayer(record.uuid());
-        if (player == null) {
-            return;
-        }
-        String playerName = player.getName();
-        String time = DurationFormatter.formatSeconds(record.durationSeconds());
-        String message = messageService.applyPlaceholders(template, Map.of(
-                "%player%", playerName,
-                "%reason%", record.reason(),
-                "%time%", time,
-                "%actor%", record.actor()
-        ));
-        runSync(() -> player.sendMessage(messageService.format(message)));
+        runSync(() -> {
+            Player player = Bukkit.getPlayer(record.uuid());
+            if (player == null) {
+                return;
+            }
+            String playerName = player.getName();
+            String time = DurationFormatter.formatSeconds(record.durationSeconds());
+            String rendered = messageService.applyPlaceholders(template, Map.of(
+                    "%player%", playerName,
+                    "%reason%", record.reason(),
+                    "%time%", time,
+                    "%actor%", record.actor(),
+                    "%id%", record.internalId()
+            ));
+            String message = ensureIdInMessage(template, rendered, record.internalId());
+            message = messageService.hideIssuerDetails(message);
+            player.sendMessage(messageService.format(message));
+        });
     }
 
     private void kickIfOnline(PunishmentRecord record) {
-        Player player = Bukkit.getPlayer(record.uuid());
-        if (player == null) {
-            return;
+        runSync(() -> {
+            Player player = Bukkit.getPlayer(record.uuid());
+            if (player == null) {
+                return;
+            }
+            String time = DurationFormatter.formatSeconds(record.durationSeconds());
+            String rendered = messageService.applyPlaceholders(messages.kickMessage(), Map.of(
+                    "%reason%", record.reason(),
+                    "%time%", time,
+                    "%actor%", record.actor(),
+                    "%id%", record.internalId()
+            ));
+            String message = ensureIdInMessage(messages.kickMessage(), rendered, record.internalId());
+            message = messageService.hideIssuerDetails(message);
+            player.kick(messageService.formatRaw(message));
+        });
+    }
+
+    private String ensureIdInMessage(String template, String rendered, String id) {
+        if (template != null && template.contains("%id%")) {
+            return rendered;
         }
-        String time = DurationFormatter.formatSeconds(record.durationSeconds());
-        String message = messageService.applyPlaceholders(messages.kickMessage(), Map.of(
-                "%reason%", record.reason(),
-                "%time%", time,
-                "%actor%", record.actor()
-        ));
-        runSync(() -> player.kick(messageService.format(message)));
+        return rendered + "\n<gray>ID наказания:</gray> <white>" + id + "</white>";
+    }
+
+    private boolean canReceiveNotifications(Player player) {
+        return player.hasPermission("bans.fullaccess")
+                || player.hasPermission("bans.ban")
+                || player.hasPermission("bans.tempban")
+                || player.hasPermission("bans.ipban")
+                || player.hasPermission("bans.warn")
+                || player.hasPermission("bans.check")
+                || player.hasPermission("bans.punish");
     }
 }
