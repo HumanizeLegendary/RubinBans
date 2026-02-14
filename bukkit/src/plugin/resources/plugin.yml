@@ -27,8 +27,8 @@ commands:
     description: "Проверить наказание по ID."
     usage: "/checkpunish <id>"
   playercheckpunish:
-    description: "Проверить наказание по ID (дополнительная команда)."
-    usage: "/playercheckpunish <id>"
+    description: "Показать все наказания игрока."
+    usage: "/playercheckpunish <игрок|uuid>"
   unpunish:
     description: "Снять наказание по ID."
     usage: "/unpunish <id> [причина]"

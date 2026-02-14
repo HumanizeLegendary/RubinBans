@@ -73,7 +73,7 @@ public final class PluginBansPaper extends JavaPlugin {
         registerCommandExecutor("punish", customPunishCommand);
         CheckPunishCommand checkPunishCommand = new CheckPunishCommand(punishmentService, messages);
         registerCommandExecutor("checkpunish", checkPunishCommand);
-        registerCommandExecutor("playercheckpunish", checkPunishCommand);
+        registerCommandExecutor("playercheckpunish", new PlayerCheckPunishCommand(punishmentService, messages));
         registerCommandExecutor("unpunish", new UnpunishCommand(punishmentService, messages));
     }
 
