@@ -33,9 +33,10 @@ import java.util.UUID;
 public final class CustomPunishCommand implements CommandExecutor, Listener {
     private static final int INVENTORY_SIZE = 27;
     private static final int[] OPTION_SLOTS = {10, 11, 12, 13, 14};
-    private static final Material BORDER_MATERIAL = Material.RED_STAINED_GLASS_PANE;
+    private static final int EDGE_GLASS_SLOT = 15;
+    private static final Material BORDER_MATERIAL = Material.GRAY_STAINED_GLASS_PANE;
     private static final Material OPTION_MATERIAL = Material.FERMENTED_SPIDER_EYE;
-    private static final Material EMPTY_PRIMARY_MATERIAL = Material.GRAY_DYE;
+    private static final Material EMPTY_SLOT_MATERIAL = Material.GRAY_DYE;
 
     private final JavaPlugin plugin;
     private final PaperPunishmentService service;
@@ -86,11 +87,6 @@ public final class CustomPunishCommand implements CommandExecutor, Listener {
         int slot = event.getRawSlot();
         MenuPunishment punishment = holder.punishmentAt(slot);
         if (punishment == null) {
-            ItemStack clicked = top.getItem(slot);
-            if (slot == OPTION_SLOTS[0] && clicked != null && clicked.getType() == EMPTY_PRIMARY_MATERIAL) {
-                service.messageService().send(player, "<gray>Пока ничего нет. Настройте punish.menu.punishments в config.yml.</gray>");
-                return;
-            }
             if (isOptionSlot(slot)) {
                 service.messageService().send(player, "<yellow>Пустой слот. Добавьте наказание в config.yml -> punish.menu.punishments.</yellow>");
             }
@@ -179,19 +175,14 @@ public final class CustomPunishCommand implements CommandExecutor, Listener {
 
     private void renderLayout(PunishMenuHolder holder, List<MenuPunishment> punishments) {
         Inventory inventory = holder.inventory();
-        ItemStack border = createBorderItem();
-        for (int slot = 0; slot <= 8; slot++) {
-            inventory.setItem(slot, border);
+        ItemStack empty = createEmptyPunishmentItem();
+        for (int slot = 0; slot < INVENTORY_SIZE; slot++) {
+            inventory.setItem(slot, empty);
         }
-        for (int slot = 18; slot <= 26; slot++) {
-            inventory.setItem(slot, border);
-        }
-        inventory.setItem(9, border);
-        inventory.setItem(15, border);
+        inventory.setItem(EDGE_GLASS_SLOT, createBorderItem());
 
         if (punishments.isEmpty()) {
-            inventory.setItem(OPTION_SLOTS[0], createNoPunishmentsItem());
-            for (int i = 1; i < OPTION_SLOTS.length; i++) {
+            for (int i = 0; i < OPTION_SLOTS.length; i++) {
                 inventory.setItem(OPTION_SLOTS[i], createEmptyPunishmentItem());
             }
             return;
@@ -371,24 +362,12 @@ public final class CustomPunishCommand implements CommandExecutor, Listener {
     }
 
     private ItemStack createEmptyPunishmentItem() {
-        ItemStack item = new ItemStack(OPTION_MATERIAL);
+        ItemStack item = new ItemStack(EMPTY_SLOT_MATERIAL);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(service.messageService().formatRaw("<gray>Пустой слот</gray>"));
         meta.lore(List.of(
                 service.messageService().formatRaw("<dark_gray>Добавьте наказание в config.yml</dark_gray>"),
                 service.messageService().formatRaw("<dark_gray>punish.menu.punishments</dark_gray>")
-        ));
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    private ItemStack createNoPunishmentsItem() {
-        ItemStack item = new ItemStack(EMPTY_PRIMARY_MATERIAL);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(service.messageService().formatRaw("<gray>Пока ничего нет</gray>"));
-        meta.lore(List.of(
-                service.messageService().formatRaw("<dark_gray>Пока ничего нет</dark_gray>"),
-                service.messageService().formatRaw("<dark_gray>Настройте punish.menu.punishments в config.yml</dark_gray>")
         ));
         item.setItemMeta(meta);
         return item;
