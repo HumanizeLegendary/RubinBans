@@ -218,6 +218,10 @@ public final class PluginBansPaper extends JavaPlugin {
         if (!config.apiEnabled()) {
             return;
         }
+        if (!isSecureApiToken(config.apiToken())) {
+            getLogger().severe("Forum API не запущен: укажите безопасный api.token (не менее 16 символов, не дефолтный).");
+            return;
+        }
         try {
             this.forumApiServer = new ForumApiServer(punishmentService, config);
             this.forumApiServer.start();
@@ -225,6 +229,19 @@ public final class PluginBansPaper extends JavaPlugin {
         } catch (Exception exception) {
             getLogger().severe("Failed to start Forum API: " + exception.getMessage());
         }
+    }
+
+    private boolean isSecureApiToken(String token) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        String normalized = token.trim();
+        if (normalized.length() < 16) {
+            return false;
+        }
+        return !normalized.equalsIgnoreCase("CHANGE_ME")
+                && !normalized.equalsIgnoreCase("CHANGE_ME_LONG_RANDOM_TOKEN")
+                && !normalized.equalsIgnoreCase("PASTE_LONG_RANDOM_TOKEN");
     }
 
     private void registerCommandExecutor(String commandName, CommandExecutor executor) {

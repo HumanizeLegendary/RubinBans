@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -162,6 +163,10 @@ public final class JdbcPunishmentRepository implements PunishmentRepository {
     }
 
     private List<PunishmentRecord> queryList(String sql, StatementConsumer binder) {
+        return queryList(sql, binder, true);
+    }
+
+    private List<PunishmentRecord> queryList(String sql, StatementConsumer binder, boolean allowSchemaRetry) {
         List<PunishmentRecord> records = new ArrayList<>();
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -172,9 +177,35 @@ public final class JdbcPunishmentRepository implements PunishmentRepository {
                 }
             }
         } catch (SQLException exception) {
+            if (allowSchemaRetry && isMissingTableError(exception)) {
+                try {
+                    ensureSchema();
+                    return queryList(sql, binder, false);
+                } catch (SQLException schemaException) {
+                    throw new IllegalStateException("Не удалось инициализировать базу данных.", schemaException);
+                }
+            }
             throw new IllegalStateException("Не удалось загрузить список наказаний.", exception);
         }
         return records;
+    }
+
+    private void ensureSchema() throws SQLException {
+        try (Connection connection = dataSource.getConnection()) {
+            DatabaseSchema.ensure(connection);
+        }
+    }
+
+    private boolean isMissingTableError(SQLException exception) {
+        SQLException current = exception;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase(Locale.ROOT).contains("no such table")) {
+                return true;
+            }
+            current = current.getNextException();
+        }
+        return false;
     }
 
     private PunishmentRecord map(ResultSet resultSet) throws SQLException {

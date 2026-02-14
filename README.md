@@ -2,6 +2,11 @@
 
 Современное ядро наказаний для Paper 1.21–1.21.10 (Java 21) с поддержкой Velocity, SQLite/MySQL, REST-эндпоинтом и Discord-синхронизацией (логика).
 
+## Размер кодовой базы
+
+Общее количество строк Java-кода: **9421**  
+Подсчёт: `rg --files -g '*.java' | xargs wc -l`
+
 ## Команды
 
 | Команда | Описание |
@@ -51,6 +56,19 @@ database:
     password: ""
 ```
 
+## Принцип настройки
+
+1. Выберите хранилище:
+`database.type: SQLITE` для одного сервера или `MYSQL` для сети/кластеров.
+2. Настройте правила наказаний:
+`punish.warn-duration-seconds`, `warn.allowed-reasons`, `check.*`.
+3. Проверьте синхронизацию:
+`sync.poll-seconds` (Paper) и `sync-poll-seconds` (Velocity).
+4. Включайте API только с безопасным токеном:
+`api.token` должен быть не дефолтный и длиной минимум 16 символов.
+5. Кастомизируйте UX:
+`messages.yml` отвечает за оформление выдачи наказаний и бан-табличку кика.
+
 ## Система ID
 
 Каждое наказание получает короткий ID из 6 символов (например: `A1B2C3`).
@@ -78,7 +96,7 @@ NNR-наказания настраиваются через список `punis
 * Velocity проверяет наказания при входе и мгновенно отключает игрока.
 * Обход через лобби не допускается.
 
-Конфигурация Velocity: `plugins/PluginBans/velocity-config.json`.
+Конфигурация Velocity: `plugins/pluginbans/config.toml`.
 
 ## Forum API
 
@@ -95,16 +113,23 @@ api:
 Авторизация:
 * `X-API-Token: <token>`
 * или `Authorization: Bearer <token>`
+* API не стартует с дефолтным/слабым токеном.
 
 Базовый путь: `/api/v1`
 
 Основные endpoint'ы:
 * `GET /api/v1/health` — проверка доступности API
+* `GET /api/v1/meta` — мета API (доступные endpoint'ы и базовые ограничения)
 * `GET /api/v1/punishments/{id}` — получить наказание по ID
 * `POST /api/v1/punishments` — выдать наказание
 * `POST /api/v1/punishments/{id}/revoke` — снять наказание
 * `GET /api/v1/players/{target}/active` — активные наказания игрока
 * `GET /api/v1/players/{target}/history` — история наказаний игрока
+
+Обновления API:
+* `TEMPBAN` через API требует срок `> 0`.
+* Повторный revoke неактивного наказания возвращает `409`.
+* Невалидный JSON возвращает `400`.
 
 Пример выдачи наказания:
 ```json

@@ -2,6 +2,7 @@ package com.pluginbans.paper;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSyntaxException;
 import com.pluginbans.core.DurationParser;
 import com.pluginbans.core.PunishmentHistoryRecord;
 import com.pluginbans.core.PunishmentRecord;
@@ -27,6 +28,11 @@ import java.util.concurrent.Executors;
 
 public final class ForumApiServer implements AutoCloseable {
     private static final String API_PREFIX = "/api/v1";
+    private static final List<String> FORBIDDEN_TOKENS = List.of(
+            "CHANGE_ME",
+            "CHANGE_ME_LONG_RANDOM_TOKEN",
+            "PASTE_LONG_RANDOM_TOKEN"
+    );
 
     private final PaperPunishmentService service;
     private final PaperConfig config;
@@ -71,6 +77,10 @@ public final class ForumApiServer implements AutoCloseable {
                 sendJson(exchange, 200, Map.of("ok", true, "time", Instant.now().toString()));
                 return;
             }
+            if ("GET".equals(method) && segments.size() == 1 && "meta".equalsIgnoreCase(segments.get(0))) {
+                handleMeta(exchange);
+                return;
+            }
             if ("POST".equals(method) && segments.size() == 1 && "punishments".equalsIgnoreCase(segments.get(0))) {
                 handleCreatePunishment(exchange);
                 return;
@@ -102,7 +112,13 @@ public final class ForumApiServer implements AutoCloseable {
     }
 
     private void handleCreatePunishment(HttpExchange exchange) throws IOException {
-        CreatePunishmentRequest request = gson.fromJson(readBody(exchange), CreatePunishmentRequest.class);
+        CreatePunishmentRequest request;
+        try {
+            request = gson.fromJson(readBody(exchange), CreatePunishmentRequest.class);
+        } catch (JsonSyntaxException exception) {
+            sendJson(exchange, 400, Map.of("ok", false, "error", "Invalid JSON payload"));
+            return;
+        }
         if (request == null || isBlank(request.target) || isBlank(request.type) || isBlank(request.reason)) {
             sendJson(exchange, 400, Map.of("ok", false, "error", "target, type and reason are required"));
             return;
@@ -204,13 +220,27 @@ public final class ForumApiServer implements AutoCloseable {
 
     private void handleRevokePunishment(HttpExchange exchange, String id) throws IOException {
         String punishmentId = id.toUpperCase(Locale.ROOT);
-        RevokePunishmentRequest request = gson.fromJson(readBody(exchange), RevokePunishmentRequest.class);
+        RevokePunishmentRequest request;
+        try {
+            request = gson.fromJson(readBody(exchange), RevokePunishmentRequest.class);
+        } catch (JsonSyntaxException exception) {
+            sendJson(exchange, 400, Map.of("ok", false, "error", "Invalid JSON payload"));
+            return;
+        }
         String actor = request == null || isBlank(request.actor) ? "ForumAPI" : request.actor.trim();
         String reason = request == null || isBlank(request.reason) ? "Снято через API" : request.reason.trim();
         try {
             Optional<PunishmentRecord> existing = service.core().findByInternalId(punishmentId).join();
             if (existing.isEmpty()) {
                 sendJson(exchange, 404, Map.of("ok", false, "error", "Punishment not found"));
+                return;
+            }
+            if (!existing.get().active()) {
+                sendJson(exchange, 409, Map.of(
+                        "ok", false,
+                        "error", "Punishment already inactive",
+                        "punishment", toPunishmentMap(existing.get())
+                ));
                 return;
             }
             service.core().removePunishment(punishmentId, actor, reason, "API_REMOVE").join();
@@ -278,19 +308,47 @@ public final class ForumApiServer implements AutoCloseable {
     }
 
     private long resolveDurationSeconds(CreatePunishmentRequest request, PunishmentType type) {
+        long resolved;
         if (request.durationSeconds != null) {
             if (request.durationSeconds < 0L) {
                 throw new IllegalArgumentException("durationSeconds must be >= 0");
             }
-            return request.durationSeconds;
+            resolved = request.durationSeconds;
+        } else if (!isBlank(request.duration)) {
+            resolved = DurationParser.parseToSeconds(request.duration.trim());
+        } else if (type == PunishmentType.WARN) {
+            resolved = service.config().warnDurationSeconds();
+        } else {
+            resolved = 0L;
         }
-        if (!isBlank(request.duration)) {
-            return DurationParser.parseToSeconds(request.duration.trim());
+        if (type == PunishmentType.TEMPBAN && resolved == 0L) {
+            throw new IllegalArgumentException("TEMPBAN requires duration > 0");
         }
-        if (type == PunishmentType.WARN) {
-            return service.config().warnDurationSeconds();
-        }
-        return 0L;
+        return resolved;
+    }
+
+    private void handleMeta(HttpExchange exchange) throws IOException {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("ok", true);
+        payload.put("apiVersion", "v1");
+        payload.put("time", Instant.now().toString());
+        payload.put("warnAllowedReasons", config.warnAllowedReasons());
+        payload.put("warnExternalActors", config.warnExternalActors());
+        payload.put("defaults", Map.of(
+                "warnDurationSeconds", config.warnDurationSeconds(),
+                "checkDurationSeconds", config.checkDurationSeconds(),
+                "checkTimeoutBanSeconds", config.checkTimeoutBanSeconds()
+        ));
+        payload.put("endpoints", List.of(
+                "GET /api/v1/health",
+                "GET /api/v1/meta",
+                "POST /api/v1/punishments",
+                "GET /api/v1/punishments/{id}",
+                "POST /api/v1/punishments/{id}/revoke",
+                "GET /api/v1/players/{target}/active",
+                "GET /api/v1/players/{target}/history"
+        ));
+        sendJson(exchange, 200, payload);
     }
 
     private Map<String, Object> toPunishmentMap(PunishmentRecord record) {
@@ -359,7 +417,7 @@ public final class ForumApiServer implements AutoCloseable {
 
     private boolean isAuthorized(HttpExchange exchange) {
         String configuredToken = config.apiToken();
-        if (isBlank(configuredToken)) {
+        if (isWeakToken(configuredToken)) {
             return false;
         }
         String token = exchange.getRequestHeaders().getFirst("X-API-Token");
@@ -374,9 +432,26 @@ public final class ForumApiServer implements AutoCloseable {
         return false;
     }
 
+    private boolean isWeakToken(String token) {
+        if (token == null || token.isBlank()) {
+            return true;
+        }
+        String normalized = token.trim();
+        if (normalized.length() < 16) {
+            return true;
+        }
+        for (String forbidden : FORBIDDEN_TOKENS) {
+            if (forbidden.equalsIgnoreCase(normalized)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void sendJson(HttpExchange exchange, int statusCode, Object payload) throws IOException {
         byte[] body = gson.toJson(payload).getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        exchange.getResponseHeaders().set("X-PluginBans-Api-Version", "v1");
         exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
         exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Token");
         exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");

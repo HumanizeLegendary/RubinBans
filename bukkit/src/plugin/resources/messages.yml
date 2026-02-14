@@ -1,26 +1,47 @@
-prefix: "<red>БАНЫ | </red>"
+prefix: "<gradient:#ff4d4d:#ffb347><bold>PluginBans</bold></gradient> <dark_gray>></dark_gray> "
 
-ban: "<red>%player%</red> был забанен. <gray>Причина:</gray> <white>%reason%</white> <gray>Длительность:</gray> <white>%time%</white> <gray>Выдал:</gray> <white>%actor%</white> <gray>ID:</gray> <white>%id%</white>"
-mute: "<yellow>%player%</yellow> получил мут. <gray>Причина:</gray> <white>%reason%</white> <gray>Длительность:</gray> <white>%time%</white> <gray>Выдал:</gray> <white>%actor%</white> <gray>ID:</gray> <white>%id%</white>"
-warn: "<gold>%player%</gold> получил варн (блокировка 14 дней). <gray>Причина:</gray> <white>%reason%</white> <gray>Выдал:</gray> <white>%actor%</white> <gray>ID:</gray> <white>%id%</white>"
-check: "<aqua>%player%</aqua> отправлен на проверку. <gray>Выдал:</gray> <white>%actor%</white> <gray>ID:</gray> <white>%id%</white>"
+ban: |-
+  <dark_gray>┌────────────────────────────────────────────┐</dark_gray>
+  <dark_gray>│</dark_gray> <red><bold>Выдан бан</bold></red>
+  <dark_gray>│</dark_gray> <gray>Игрок:</gray> <white>%player%</white>
+  <dark_gray>│</dark_gray> <gray>Причина:</gray> <white>%reason%</white>
+  <dark_gray>│</dark_gray> <gray>Срок:</gray> <white>%time%</white>
+  <dark_gray>│</dark_gray> <gray>Модератор:</gray> <white>%actor%</white>
+  <dark_gray>│</dark_gray> <gray>ID:</gray> <yellow>%id%</yellow>
+  <dark_gray>└────────────────────────────────────────────┘</dark_gray>
+
+mute: |-
+  <yellow><bold>Мут:</bold></yellow> <white>%player%</white>
+  <gray>Причина:</gray> <white>%reason%</white> <dark_gray>|</dark_gray> <gray>Срок:</gray> <white>%time%</white> <dark_gray>|</dark_gray> <gray>ID:</gray> <yellow>%id%</yellow>
+  <gray>Выдал:</gray> <white>%actor%</white>
+
+warn: |-
+  <gold><bold>Предупреждение:</bold></gold> <white>%player%</white>
+  <gray>Причина:</gray> <white>%reason%</white> <dark_gray>|</dark_gray> <gray>ID:</gray> <yellow>%id%</yellow>
+  <gray>Выдал:</gray> <white>%actor%</white>
+
+check: |-
+  <aqua><bold>Проверка:</bold></aqua> <white>%player%</white>
+  <gray>Инициатор:</gray> <white>%actor%</white> <dark_gray>|</dark_gray> <gray>ID:</gray> <yellow>%id%</yellow>
 
 kick: |-
-  <gray>------------------------------</gray>
-  <red>Вы заблокированы.</red>
-  <gray>Причина:</gray> <white>%reason%</white>
-  <gray>Длительность:</gray> <white>%time%</white>
-  <gray>ID наказания:</gray> <white>%id%</white>
-  <gray>------------------------------</gray>
+  <dark_gray>┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓</dark_gray>
+  <dark_gray>┃</dark_gray> <red><bold>ДОСТУП ОГРАНИЧЕН</bold></red>
+  <dark_gray>┃</dark_gray> <gray>Причина:</gray> <white>%reason%</white>
+  <dark_gray>┃</dark_gray> <gray>Срок:</gray> <white>%time%</white>
+  <dark_gray>┃</dark_gray> <gray>Выдал:</gray> <white>%actor%</white>
+  <dark_gray>┃</dark_gray> <gray>ID наказания:</gray> <yellow>%id%</yellow>
+  <dark_gray>┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛</dark_gray>
+  <gray>Для апелляции используйте ID наказания.</gray>
 
-check-block: "<red>Во время проверки чат заблокирован. Передайте AnyDesk код.</red>"
-muted-chat: "<red>Вы в муте.</red> <gray>Причина:</gray> <white>%reason%</white> <gray>Осталось:</gray> <white>%time%</white>"
+check-block: "<red>Во время проверки чат ограничен. Передайте AnyDesk код модератору.</red>"
+muted-chat: "<red>Чат заблокирован (мут).</red> <gray>Причина:</gray> <white>%reason%</white> <gray>Осталось:</gray> <white>%time%</white>"
 
-permission-denied: "<red>У вас нет прав на это действие.</red>"
+permission-denied: "<red>Недостаточно прав для этого действия.</red>"
 
 errors:
-  usage: "<red>Неверное использование команды.</red>"
-  player_not_found: "<red>Игрок не найден.</red>"
-  duration: "<red>Неверный формат длительности.</red>"
+  usage: "<red>Неверное использование команды. Проверьте синтаксис.</red>"
+  player_not_found: "<red>Игрок не найден (не в сети и не в кеше).</red>"
+  duration: "<red>Неверный формат длительности. Пример: 15m, 2h, 1d2h.</red>"
   reason: "<red>Укажите причину наказания.</red>"
   type: "<red>Недопустимый тип наказания.</red>"

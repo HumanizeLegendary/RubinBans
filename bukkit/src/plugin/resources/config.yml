@@ -40,4 +40,5 @@ api:
   enabled: false
   bind: "127.0.0.1"
   port: 8777
+  # Минимум 16 символов. Дефолтные токены автоматически считаются небезопасными.
   token: "CHANGE_ME_LONG_RANDOM_TOKEN"

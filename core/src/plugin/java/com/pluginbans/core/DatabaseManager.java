@@ -5,7 +5,6 @@ import com.zaxxer.hikari.HikariDataSource;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,40 +39,8 @@ public final class DatabaseManager implements AutoCloseable {
     }
 
     private void initializeSchema() {
-        String createPunishments = """
-                CREATE TABLE IF NOT EXISTS pluginbans_punishments (
-                    internal_id VARCHAR(64) PRIMARY KEY,
-                    uuid VARCHAR(36) NOT NULL,
-                    ip VARCHAR(45),
-                    ip_hash VARCHAR(128),
-                    type VARCHAR(32) NOT NULL,
-                    reason TEXT NOT NULL,
-                    actor VARCHAR(64) NOT NULL,
-                    start_time BIGINT NOT NULL,
-                    end_time BIGINT,
-                    active BOOLEAN NOT NULL,
-                    silent BOOLEAN NOT NULL
-                )
-                """;
-        String createHistory = """
-                CREATE TABLE IF NOT EXISTS pluginbans_punishment_history (
-                    id VARCHAR(96) PRIMARY KEY,
-                    uuid VARCHAR(36) NOT NULL,
-                    ip VARCHAR(45),
-                    ip_hash VARCHAR(128),
-                    type VARCHAR(32) NOT NULL,
-                    reason TEXT NOT NULL,
-                    actor VARCHAR(64) NOT NULL,
-                    start_time BIGINT NOT NULL,
-                    end_time BIGINT,
-                    internal_id VARCHAR(64) NOT NULL,
-                    action VARCHAR(32) NOT NULL,
-                    action_time BIGINT NOT NULL
-                )
-                """;
-        try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
-            statement.execute(createPunishments);
-            statement.execute(createHistory);
+        try (Connection connection = dataSource.getConnection()) {
+            DatabaseSchema.ensure(connection);
         } catch (SQLException exception) {
             throw new IllegalStateException("Не удалось инициализировать базу данных.", exception);
         }
