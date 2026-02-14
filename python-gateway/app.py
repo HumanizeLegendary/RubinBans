@@ -8,9 +8,10 @@ rate-limiting, or custom integration logic) without changing Java plugin code.
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import os
 import secrets
-from typing import Dict
+from typing import AsyncIterator, Dict
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -23,28 +24,28 @@ GATEWAY_TOKEN = os.getenv("GATEWAY_TOKEN", "").strip()
 REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "10"))
 
 
-app = FastAPI(
-    title="PluginBans Python Gateway",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-)
-
-
-@app.on_event("startup")
-async def on_startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if not UPSTREAM_TOKEN:
         raise RuntimeError("PLUGINBANS_TOKEN is required")
     if not GATEWAY_TOKEN:
         raise RuntimeError("GATEWAY_TOKEN is required")
     app.state.http = httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS)
+    try:
+        yield
+    finally:
+        client: httpx.AsyncClient | None = getattr(app.state, "http", None)
+        if client is not None:
+            await client.aclose()
 
 
-@app.on_event("shutdown")
-async def on_shutdown() -> None:
-    client: httpx.AsyncClient | None = getattr(app.state, "http", None)
-    if client is not None:
-        await client.aclose()
+app = FastAPI(
+    title="PluginBans Python Gateway",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
+)
 
 
 def _extract_token(request: Request) -> str:
