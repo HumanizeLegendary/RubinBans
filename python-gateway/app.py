@@ -9,19 +9,72 @@ rate-limiting, or custom integration logic) without changing Java plugin code.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import json
 import os
+from pathlib import Path
 import secrets
-from typing import AsyncIterator, Dict
+from typing import Any, AsyncIterator, Dict
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
 API_PREFIX = "/api/v1"
-UPSTREAM_BASE_URL = os.getenv("PLUGINBANS_BASE_URL", "http://127.0.0.1:8777/api/v1").rstrip("/")
-UPSTREAM_TOKEN = os.getenv("PLUGINBANS_TOKEN", "").strip()
-GATEWAY_TOKEN = os.getenv("GATEWAY_TOKEN", "").strip()
-REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "10"))
+BASE_DIR = Path(__file__).resolve().parent
+CONFIG_PATH = Path(os.getenv("GATEWAY_CONFIG", str(BASE_DIR / "gateway-config.json")))
+
+
+def _load_file_config(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8") as handle:
+        raw = json.load(handle)
+    if not isinstance(raw, dict):
+        raise RuntimeError(f"Gateway config must be JSON object: {path}")
+    return raw
+
+
+FILE_CONFIG = _load_file_config(CONFIG_PATH)
+
+
+def _read_setting(env_name: str, config_name: str, default: str = "") -> str:
+    env_value = os.getenv(env_name)
+    if env_value is not None and env_value.strip():
+        return env_value.strip()
+    config_value = FILE_CONFIG.get(config_name)
+    if config_value is None:
+        return default
+    return str(config_value).strip()
+
+
+def _read_int_setting(env_name: str, config_name: str, default: int) -> int:
+    value = _read_setting(env_name, config_name, str(default))
+    try:
+        return int(value)
+    except ValueError as exception:
+        raise RuntimeError(f"Invalid integer for {env_name}/{config_name}: {value}") from exception
+
+
+def _read_float_setting(env_name: str, config_name: str, default: float) -> float:
+    value = _read_setting(env_name, config_name, str(default))
+    try:
+        return float(value)
+    except ValueError as exception:
+        raise RuntimeError(f"Invalid float for {env_name}/{config_name}: {value}") from exception
+
+
+def _read_bool_setting(env_name: str, config_name: str, default: bool) -> bool:
+    value = _read_setting(env_name, config_name, "true" if default else "false").lower()
+    return value in {"1", "true", "yes", "on"}
+
+
+UPSTREAM_BASE_URL = _read_setting("PLUGINBANS_BASE_URL", "upstream_base_url", "http://127.0.0.1:8777/api/v1").rstrip("/")
+UPSTREAM_TOKEN = _read_setting("PLUGINBANS_TOKEN", "upstream_token")
+GATEWAY_TOKEN = _read_setting("GATEWAY_TOKEN", "gateway_token")
+REQUEST_TIMEOUT_SECONDS = _read_float_setting("REQUEST_TIMEOUT_SECONDS", "request_timeout_seconds", 10.0)
+LISTEN_HOST = _read_setting("GATEWAY_HOST", "listen_host", "0.0.0.0")
+LISTEN_PORT = _read_int_setting("GATEWAY_PORT", "listen_port", 8080)
+UPSTREAM_TRUST_ENV = _read_bool_setting("UPSTREAM_TRUST_ENV", "upstream_trust_env", False)
 
 
 @asynccontextmanager
@@ -30,7 +83,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         raise RuntimeError("PLUGINBANS_TOKEN is required")
     if not GATEWAY_TOKEN:
         raise RuntimeError("GATEWAY_TOKEN is required")
-    app.state.http = httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS)
+    app.state.http = httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS, trust_env=UPSTREAM_TRUST_ENV)
     try:
         yield
     finally:
@@ -121,6 +174,7 @@ async def root() -> dict[str, str]:
     return {
         "service": "PluginBans Python Gateway",
         "upstream": UPSTREAM_BASE_URL,
+        "listen": f"{LISTEN_HOST}:{LISTEN_PORT}",
         "docs": "/docs",
     }
 
@@ -158,3 +212,9 @@ async def player_active(target: str, request: Request) -> Response:
 @app.get(f"{API_PREFIX}/players/{{target}}/history")
 async def player_history(target: str, request: Request) -> Response:
     return await _proxy_get(f"/players/{target}/history", request)
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host=LISTEN_HOST, port=LISTEN_PORT)

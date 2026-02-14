@@ -91,3 +91,9 @@ local.properties
 *.ear
 /lib
 **/*~
+
+### Python gateway ###
+python-gateway/.venv/
+python-gateway/__pycache__/
+python-gateway/*.pyc
+python-gateway/gateway-config.json

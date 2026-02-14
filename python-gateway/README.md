@@ -36,21 +36,41 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Environment variables
+## Quick setup (config file, easiest)
+
+```bash
+cp gateway-config.example.json gateway-config.json
+```
+
+Edit `gateway-config.json`:
+
+- `upstream_base_url` -> address of PluginBans API server
+- `upstream_token` -> `api.token` from PluginBans config
+- `gateway_token` -> token for your external clients/forum
+
+Then run:
+
+```bash
+python3 app.py
+```
+
+Server will listen on `listen_host:listen_port` from config.
+
+## Environment variables (optional overrides)
 
 - `PLUGINBANS_BASE_URL` (default: `http://127.0.0.1:8777/api/v1`)
 - `PLUGINBANS_TOKEN` (required) token used for upstream PluginBans API
 - `GATEWAY_TOKEN` (required) token required from clients of Python gateway
 - `REQUEST_TIMEOUT_SECONDS` (optional, default: `10`)
+- `GATEWAY_HOST` (default: `0.0.0.0`)
+- `GATEWAY_PORT` (default: `8080`)
+- `UPSTREAM_TRUST_ENV` (default: `false`, disables system proxies for upstream requests)
+- `GATEWAY_CONFIG` (optional path to `gateway-config.json`)
 
 ## Run
 
 ```bash
-export PLUGINBANS_BASE_URL="http://127.0.0.1:8777/api/v1"
-export PLUGINBANS_TOKEN="PLUGINBANS_LONG_TOKEN_16+"
-export GATEWAY_TOKEN="GATEWAY_LONG_TOKEN_16+"
-
-uvicorn app:app --host 0.0.0.0 --port 8080
+python3 app.py
 ```
 
 ## Endpoints

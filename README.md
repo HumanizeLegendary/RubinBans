@@ -165,6 +165,7 @@ api:
 
 * `python-gateway/app.py` — FastAPI gateway
 * `python-gateway/README.md` — установка и запуск
+* `python-gateway/gateway-config.example.json` — шаблон простой настройки
 
 Схема: внешний клиент -> Python gateway -> локальный PluginBans API (`127.0.0.1:8777`).
 

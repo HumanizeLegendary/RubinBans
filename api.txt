@@ -182,18 +182,26 @@ History item fields:
 If you prefer separate Python web-server, use folder:
 - python-gateway/app.py
 - python-gateway/README.md
+- python-gateway/gateway-config.example.json
 
 Recommended topology:
 - PluginBans API is local-only:
   api.bind: "127.0.0.1"
   api.port: 8777
 - Python gateway is public:
-  uvicorn app:app --host 0.0.0.0 --port 8080
+  python3 app.py
 
-Gateway environment:
-- PLUGINBANS_BASE_URL="http://127.0.0.1:8777/api/v1"
-- PLUGINBANS_TOKEN="<plugin token>"
-- GATEWAY_TOKEN="<external token>"
+Simplest setup:
+1) Copy config:
+   cp python-gateway/gateway-config.example.json python-gateway/gateway-config.json
+2) Edit fields:
+   upstream_base_url, upstream_token, gateway_token, listen_host, listen_port
+3) Run:
+   cd python-gateway && python3 app.py
 
 External clients call Python gateway with GATEWAY_TOKEN.
 Python gateway forwards requests to PluginBans API with PLUGINBANS_TOKEN.
+
+Important:
+- If `http_proxy`/`https_proxy` is set on host, gateway ignores it by default.
+- To enable system proxy usage, set `upstream_trust_env: true` (or `UPSTREAM_TRUST_ENV=true`).

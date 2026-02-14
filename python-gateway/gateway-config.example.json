@@ -1,0 +1,9 @@
+{
+  "listen_host": "0.0.0.0",
+  "listen_port": 8080,
+  "upstream_base_url": "http://85.95.187.242:8777/api/v1",
+  "upstream_token": "PUT_PLUGINBANS_API_TOKEN_HERE",
+  "gateway_token": "PUT_EXTERNAL_GATEWAY_TOKEN_HERE",
+  "request_timeout_seconds": 10,
+  "upstream_trust_env": false
+}
