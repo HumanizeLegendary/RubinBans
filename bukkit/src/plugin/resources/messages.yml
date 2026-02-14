@@ -35,7 +35,7 @@ kick: |-
   <gray>Для апелляции используйте ID наказания.</gray>
 
 check-block: "<red>Во время проверки чат ограничен. Передайте AnyDesk код модератору.</red>"
-muted-chat: "<red>Чат заблокирован (мут).</red> <gray>Причина:</gray> <white>%reason%</white> <gray>Осталось:</gray> <white>%time%</white>"
+muted-chat: "<red>Чат заблокирован (мут).</red> <gray>Причина:</gray> <white>%reason%</white> <gray>Осталось:</gray> <white>%time%</white> <dark_gray>|</dark_gray> <gray>ID:</gray> <yellow>%id%</yellow>"
 
 permission-denied: "<red>Недостаточно прав для этого действия.</red>"
 

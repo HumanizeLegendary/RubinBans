@@ -4,8 +4,13 @@
 
 ## Размер кодовой базы
 
-Общее количество строк Java-кода: **9421**  
+Общее количество строк Java-кода: **9584**  
 Подсчёт: `rg --files -g '*.java' | xargs wc -l`
+
+## Тесты сборки
+
+При `mvn package` выполняются тесты модуля `core`, включая проверки БД для банов и мутов:
+`core/src/test/java/com/pluginbans/core/JdbcPunishmentRepositoryTest.java`.
 
 ## Команды
 

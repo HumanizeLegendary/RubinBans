@@ -97,13 +97,14 @@ public final class PunishmentListener implements Listener {
             return;
         }
         String messageText = PlainTextComponentSerializer.plainText().serialize(event.message());
-        String response = service.messageService().applyPlaceholders(messages.mutedChatMessage(), Map.of(
-                "%reason%", mute.get().reason(),
-                "%time%", DurationFormatter.formatSeconds(mute.get().durationSeconds()),
-                "%message%", messageText
-        ));
+        String response = muteBlockedMessage(mute.get(), messageText);
         event.setCancelled(true);
-        event.getPlayer().sendMessage(service.messageService().format(response));
+        service.runSync(() -> {
+            org.bukkit.entity.Player online = org.bukkit.Bukkit.getPlayer(uuid);
+            if (online != null && online.isOnline()) {
+                online.sendMessage(service.messageService().format(response));
+            }
+        });
     }
 
     @EventHandler
@@ -172,10 +173,7 @@ public final class PunishmentListener implements Listener {
         Optional<PunishmentRecord> mute = punishments.stream().filter(record -> record.type() == PunishmentType.MUTE).findFirst();
         if (mute.isPresent()) {
             event.setCancelled(true);
-            String response = service.messageService().applyPlaceholders(messages.mutedChatMessage(), Map.of(
-                    "%reason%", mute.get().reason(),
-                    "%time%", DurationFormatter.formatSeconds(mute.get().durationSeconds())
-            ));
+            String response = muteBlockedMessage(mute.get(), event.getMessage());
             event.getPlayer().sendMessage(service.messageService().format(response));
         }
     }
@@ -191,6 +189,16 @@ public final class PunishmentListener implements Listener {
         org.bukkit.Bukkit.getOnlinePlayers().stream()
                 .filter(player -> player.hasPermission("bans.check") || player.hasPermission("bans.fullaccess"))
                 .forEach(player -> player.sendMessage(service.messageService().format(message)));
+    }
+
+    private String muteBlockedMessage(PunishmentRecord mute, String originalMessage) {
+        String rendered = service.messageService().applyPlaceholders(messages.mutedChatMessage(), Map.of(
+                "%reason%", mute.reason(),
+                "%time%", DurationFormatter.formatSeconds(mute.durationSeconds()),
+                "%id%", mute.internalId(),
+                "%message%", originalMessage == null ? "" : originalMessage
+        ));
+        return withIdIfMissing(messages.mutedChatMessage(), rendered, mute.internalId());
     }
 
     private String withIdIfMissing(String template, String rendered, String id) {

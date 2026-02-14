@@ -2,6 +2,7 @@ package com.pluginbans.paper;
 
 import com.pluginbans.core.DurationParser;
 import com.pluginbans.core.DurationFormatter;
+import com.pluginbans.core.PunishmentRecord;
 import com.pluginbans.core.PunishmentType;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -235,10 +236,7 @@ public final class CustomPunishCommand implements CommandExecutor, Listener {
                         service.runSync(() -> service.messageService().send(sender, "<red>Не удалось выдать наказание.</red>"));
                         return;
                     }
-                    service.runSync(() -> service.messageService().send(
-                            sender,
-                            "<gray>ID наказания:</gray> <white>" + record.internalId() + "</white>"
-                    ));
+                    service.runSync(() -> sendIssueSummary(sender, record));
                 });
     }
 
@@ -274,6 +272,14 @@ public final class CustomPunishCommand implements CommandExecutor, Listener {
             builder.append(arg);
         }
         return builder.toString();
+    }
+
+    private void sendIssueSummary(CommandSender sender, PunishmentRecord record) {
+        String time = DurationFormatter.formatSeconds(record.durationSeconds());
+        service.messageService().send(sender,
+                "<green>Наказание выдано:</green> <white>" + record.type().name() + "</white> <dark_gray>|</dark_gray> <gray>ID:</gray> <yellow>" + record.internalId() + "</yellow>");
+        service.messageService().send(sender,
+                "<gray>Причина:</gray> <white>" + record.reason() + "</white> <dark_gray>|</dark_gray> <gray>Срок:</gray> <white>" + time + "</white>");
     }
 
     private List<MenuPunishment> loadMenuPunishments() {

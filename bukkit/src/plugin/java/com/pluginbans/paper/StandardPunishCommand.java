@@ -1,7 +1,9 @@
 package com.pluginbans.paper;
 
+import com.pluginbans.core.DurationFormatter;
 import com.pluginbans.core.DurationParser;
 import com.pluginbans.core.PunishmentRules;
+import com.pluginbans.core.PunishmentRecord;
 import com.pluginbans.core.PunishmentType;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -91,10 +93,7 @@ public final class StandardPunishCommand implements CommandExecutor {
                         service.runSync(() -> service.messageService().send(sender, "<red>Не удалось выдать наказание.</red>"));
                         return;
                     }
-                    service.runSync(() -> service.messageService().send(
-                            sender,
-                            "<gray>ID наказания:</gray> <white>" + record.internalId() + "</white>"
-                    ));
+                    service.runSync(() -> sendIssueSummary(sender, record));
                     if (type == Type.WARN) {
                         service.core().getActiveByUuid(target).whenComplete((active, warnThrowable) -> {
                             if (warnThrowable != null) {
@@ -144,6 +143,14 @@ public final class StandardPunishCommand implements CommandExecutor {
             }
         }
         return false;
+    }
+
+    private void sendIssueSummary(CommandSender sender, PunishmentRecord record) {
+        String time = DurationFormatter.formatSeconds(record.durationSeconds());
+        service.messageService().send(sender,
+                "<green>Наказание выдано:</green> <white>" + record.type().name() + "</white> <dark_gray>|</dark_gray> <gray>ID:</gray> <yellow>" + record.internalId() + "</yellow>");
+        service.messageService().send(sender,
+                "<gray>Причина:</gray> <white>" + record.reason() + "</white> <dark_gray>|</dark_gray> <gray>Срок:</gray> <white>" + time + "</white>");
     }
 
     private String joinArgs(String[] args, int start) {
